@@ -30,7 +30,7 @@ Four items in the spec were verified against the installed libraries and are wro
 
 ## Phase 0 — Partial implementation tracking
 
-Greenfield. The repo contains only `technical_specification.md` and this checklist; nothing is partially built. This section stays empty until work lands and a later task is left at `[~]`.
+- **Task 3** is `[~]`: everything under `tests/fixtures/factory.py`'s control (compliant fixture, `violating()` for all 40 rule IDs, the meta-test, `tools/make_fixtures.py`, the `wml.xsd` copy) is done. The one open item is outside the codebase's control — real `.docx` manuscripts the user is to supply into `tests/fixtures/real/`. Revisit when those files arrive; no code change implied, just adding files and, per Task 4/5's "Done when" clauses, running the parser/segmenter against them once built.
 
 ---
 
@@ -64,14 +64,14 @@ Repo tree, typed module stubs, installable package.
 - **Done when:** `to_dict()` output matches §5.4/§5.5 key-for-key against committed golden files · six deliberately-broken configs each raise `RuleConfigError` naming the rule_id and offending field
 - **Verified 2026-09-11:** 145 tests pass (41 new) · ruff and mypy --strict clean · golden files transcribed from the spec, not generated from the models under test
 
-### 3. `[ ]` Fixture factory + real-document intake *(M2, ~1.5 d)*
-`tests/fixtures/factory.py` — a `ManuscriptBuilder` emitting a compliant manuscript in memory, plus `violating(rule_id)` perturbing exactly one attribute of that baseline. The only way to honour §12's "violates exactly that rule and no other", and it keeps fixtures as readable code diffs rather than opaque binary zips.
-- `[ ]` Compliant fixture: all 14 sections, ≥2 tables (Roman, caption above), ≥2 figures (Arabic, caption below), ≥8 references, superscript bracket citations, author superscript numerals
-- `[ ]` `violating()` implemented for every rule ID in Task 6's inventory
-- `[ ]` Meta-test asserting each violating fixture differs from baseline in exactly the intended attribute
-- `[ ]` **User-supplied real manuscripts** in `tests/fixtures/real/` — ideally one clean submission, one messy, one with images, merged cells, equations. These catch the shared-blind-spot failure: python-docx output is unrealistically clean and never exercises style inheritance, theme fonts, `sectPr`, rsid-fragmented runs, or anchored images, so if the builder and parser misunderstand Word the same way, generated fixtures agree and pass while real files break
-- `[ ]` `tools/make_fixtures.py` writes fixtures to disk for human inspection in Word
-- `[ ]` Copy `wml.xsd` into `tests/schemas/` for the Task 9 validation gate
+### 3. `[~]` Fixture factory + real-document intake *(M2, ~1.5 d)*
+`tests/fixtures/factory.py` — `build_compliant()` emitting a compliant manuscript in memory, plus `violating(rule_id)` perturbing exactly one attribute of that baseline. The only way to honour §12's "violates exactly that rule and no other", and it keeps fixtures as readable code diffs rather than opaque binary zips.
+- `[x]` Compliant fixture: all 14 sections, ≥2 tables (Roman, caption above), ≥2 figures (Arabic, caption below), ≥8 references, superscript bracket citations, author superscript numerals
+- `[x]` `violating()` implemented for every rule ID in the section 6 inventory (40 entries — see the plan's "25 rows → ~38 entries" table; Task 6 authors `journal_v1.json` against this same list)
+- `[x]` Meta-test asserting each violating fixture differs from baseline in exactly the intended attribute — via direct object handles (`Handles`) into the built document plus a generic `snapshot()`/`diff()` pair, not a text-search reconstruction, since `parser/` doesn't exist yet
+- `[ ]` **User-supplied real manuscripts** in `tests/fixtures/real/` — ideally one clean submission, one messy, one with images, merged cells, equations. These catch the shared-blind-spot failure: python-docx output is unrealistically clean and never exercises style inheritance, theme fonts, `sectPr`, rsid-fragmented runs, or anchored images, so if the builder and parser misunderstand Word the same way, generated fixtures agree and pass while real files break. Blocked on the user supplying files; directory exists and is ready
+- `[x]` `tools/make_fixtures.py` writes fixtures to disk for human inspection in Word (`tools/_out/`, gitignored)
+- `[x]` Copy `wml.xsd` into `tests/schemas/` for the Task 9 validation gate — landed as `tests/schemas/ISO-IEC29500-4_2016/wml.xsd` (full ISO/IEC 29500-4:2016 schema set plus `mce/mc.xsd`, not a single file); see `tests/schemas/README.md` for the `mc:Ignorable`-stripping caveat
 
 ---
 
@@ -227,14 +227,14 @@ Three files, because the `SecretBox` seam keeps DPAPI to ~60 lines.
 | Phase | Tasks | Done | Partial | Remaining |
 |---|---|---|---|---|
 | 0 — Partial implementation tracking | 0 | 0 | 0 | 0 |
-| 1 — Foundation | 3 | 2 | 0 | 1 |
+| 1 — Foundation | 3 | 2 | 1 | 0 |
 | 2 — Document understanding | 2 | 0 | 0 | 2 |
 | 3 — Validation | 2 | 0 | 0 | 2 |
 | 4 — Correction & output | 4 | 0 | 0 | 4 |
 | 5 — Semantic layer | 1 | 0 | 0 | 1 |
 | 6 — Delivery surfaces | 2 | 0 | 0 | 2 |
 | 7 — Windows packaging & release | 2 | 0 | 0 | 2 |
-| **Total** | **16** | **2** | **0** | **14** |
+| **Total** | **16** | **2** | **1** | **13** |
 
 Estimate ≈37 dev-days. Only Task 15 requires the Windows machine.
 
@@ -276,5 +276,6 @@ QT_QPA_PLATFORM=offscreen pytest -m gui -q
 - 2026-09-11 — Checklist created from `technical_specification.md` and the approved development plan. 16 tasks across 7 phases, none started. Four spec corrections adopted before implementation (C1–C4 in the Spec alignment block) plus three unaddressed risks documented. User decisions locked: Windows VM available for Phase 7, real `.docx` samples to be supplied for Task 3, CLI before GUI, caption repositioning and title-case flag-only in v1, PySide6 over PyQt.
 - 2026-09-11 — Task 1 complete. Package scaffold, `pyproject.toml` with the gui/windows/dev dependency split, typed stubs for every pipeline module carrying the design constraints in their docstrings, and `docs/decisions.md` with C1–C5 plus the §6 deviation table. Also landed `errors.py`, `logging_setup.py` with the §13 key-redaction filter, and three guard tests (module imports, Qt-freedom, C1 `deepcopy` ban). 104 tests pass; ruff and mypy --strict clean. Added C5 (resources load via `importlib.resources`) during the work — not a spec deviation, but a cross-module constraint worth recording before Task 2 writes the loader.
 - 2026-09-11 — Task 2 complete. Domain models (AST, Violation, AuditEntry, ValidationReport, FixPlan, enums) and the pydantic rule schema and loader. Serialisation is asserted against golden files transcribed from §5.4/§5.5 rather than generated from the models, so the test proves conformance to the spec rather than self-consistency. Extension fields are emitted only when set, keeping a plain violation byte-identical to the spec's example. Loader reports malformed configs with the rule_id and field, and strips pydantic's union class names from messages — someone editing JSON never sees a class. 145 tests pass.
+- 2026-09-11 — Task 3 mostly complete (left `[~]` pending real manuscripts). `tests/fixtures/factory.py` builds a compliant manuscript directly with python-docx — no dependency on `manuscript_validator.parser`, which doesn't exist until Task 4 — and returns a `Handles` dataclass of direct references into the built document (specific runs, table/figure metadata, and lxml elements for four structural relationships) rather than requiring tests to re-find things by searching text. `violating(rule_id)` rebuilds the baseline and applies one registered mutation for each of the 40 rule IDs in the section 6 inventory (the plan's "25 rows → ~38 entries" split, confirmed against `docs/decisions.md`'s flag-only and rule-splitting decisions). The meta-test (`test_fixture_factory.py`, 43 cases) proves "violates exactly that rule and no other" generically: a `snapshot()`/`diff()` pair fingerprints every tracked run's text/font fields plus four before/after structural relationships (caption-vs-table, caption-vs-image, narrative-vs-table, two swapped section headings), and each rule asserts the changed key set equals a declared `frozenset`. Structural mutations (caption repositioning, section reordering) reuse the same fingerprint mechanism as attribute mutations by encoding position as a boolean relationship rather than an absolute index, so reordering two elements doesn't cascade into spurious diffs elsewhere in the document. Every violating document round-trips through `Document.save`/reopen without corruption. `tools/make_fixtures.py` writes all 41 documents (compliant + 40 violating) to the already-gitignored `tools/_out/` for manual inspection in Word. `tests/schemas/` (the Task 9 XSD gate) had already landed in the working tree; left as-is and referenced from the checklist. Real user-supplied manuscripts for `tests/fixtures/real/` remain outstanding — nothing in the codebase depends on them yet, since the parser they'd exercise is Task 4. 188 tests pass; ruff and mypy --strict clean (mypy scope is `src/` only per `pyproject.toml`, so `tests/`/`tools/` are ruff-checked but not mypy-strict-checked, consistent with the existing project config).
 
 _Last updated: 2026-09-11_
