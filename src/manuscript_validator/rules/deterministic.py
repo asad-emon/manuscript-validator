@@ -20,13 +20,13 @@ from typing import Any
 from manuscript_validator.models.ast import Ast, Figure, Table
 from manuscript_validator.models.enums import (
     NodeType,
-    NumberingStyle,
     OnMissingSection,
     Section,
     SelectorScope,
     ViolationStatus,
 )
 from manuscript_validator.models.violation import Violation
+from manuscript_validator.parser.captions import numeral_value
 from manuscript_validator.rules.comparators import evaluate
 from manuscript_validator.rules.schema import DeterministicRule
 from manuscript_validator.rules.selectors import (
@@ -230,31 +230,6 @@ def _evaluate_document_rule(
     return [_build_violation(rule, found=f"section '{section_name}' not found")]
 
 
-_ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
-
-
-def _roman_to_int(token: str) -> int | None:
-    total = 0
-    previous = 0
-    for char in reversed(token.upper()):
-        value = _ROMAN_VALUES.get(char)
-        if value is None:
-            return None
-        total = total - value if value < previous else total + value
-        previous = max(previous, value)
-    return total or None
-
-
-def _numeral_value(token: str | None, style: NumberingStyle | None) -> int | None:
-    if token is None:
-        return None
-    if style is NumberingStyle.ARABIC and token.isdigit():
-        return int(token)
-    if style is NumberingStyle.ROMAN:
-        return _roman_to_int(token)
-    return None
-
-
 def _check_numbering_sequence(
     ast: Ast, rule: DeterministicRule, items: list[Table] | list[Figure]
 ) -> list[Violation]:
@@ -264,7 +239,7 @@ def _check_numbering_sequence(
     violations = []
     numbered = [item for item in items if item.caption_number is not None]
     for expected_index, item in enumerate(numbered, start=1):
-        value = _numeral_value(item.caption_number, item.numbering_style)
+        value = numeral_value(item.caption_number, item.numbering_style)
         if value == expected_index:
             continue
         violations.append(
@@ -291,28 +266,37 @@ def _check_table_text_size(ast: Ast, rule: DeterministicRule) -> list[Violation]
     """Cell font size, checked across *every* cell run in *every* table --
     `Ast.Table.cell_font_size_pt` only samples one representative cell, so
     this reads `Paragraph.in_table` directly rather than going through the
-    generic paragraph/run selection (which excludes table cells entirely)."""
+    generic paragraph/run selection (which excludes table cells entirely).
+
+    One violation per *offending cell paragraph*, not per table: Task 8's fix
+    planner turns `run_indices` into per-run `FixOp`s, and `set_font_size` is
+    a run-level action -- a single table-wide violation would leave the fix
+    planner with a paragraph id but a run-scoped action and nowhere correct
+    to point it.
+    """
     violations = []
     for table in ast.tables:
-        offending: list[tuple[str, Any]] = []
         for paragraph in ast.paragraphs:
             if paragraph.in_table != table.id:
                 continue
-            for run in paragraph.runs:
-                if not matches_condition(run, rule.condition):
-                    offending.append((paragraph.id, getattr(run, rule.condition.attribute, None)))
-        if not offending:
-            continue
-        first_paragraph_id, first_value = offending[0]
-        violations.append(
-            _build_violation(
-                rule,
-                section=Section.RESULT,
-                paragraph_id=first_paragraph_id,
-                found=_found_str(rule.condition.attribute, first_value),
-                details={"table_id": table.id, "offending_count": len(offending)},
+            failing = [
+                i
+                for i, run in enumerate(paragraph.runs)
+                if not matches_condition(run, rule.condition)
+            ]
+            if not failing:
+                continue
+            bad_value = getattr(paragraph.runs[failing[0]], rule.condition.attribute, None)
+            violations.append(
+                _build_violation(
+                    rule,
+                    section=Section.RESULT,
+                    paragraph_id=paragraph.id,
+                    found=_found_str(rule.condition.attribute, bad_value),
+                    run_indices=failing,
+                    details={"table_id": table.id},
+                )
             )
-        )
     return violations
 
 

@@ -48,6 +48,50 @@ def classify_numbering(token: str) -> NumberingStyle:
     return NumberingStyle.OTHER
 
 
+_ROMAN_VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+_ROMAN_NUMERALS = (
+    (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
+    (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+)
+
+
+def roman_to_int(token: str) -> int | None:
+    """`None` for a malformed token rather than raising -- callers (a
+    numbering-sequence check, a numbering-style fix) treat "couldn't parse"
+    as "doesn't match", not as a crash."""
+    total = 0
+    previous = 0
+    for char in reversed(token.upper()):
+        value = _ROMAN_VALUES.get(char)
+        if value is None:
+            return None
+        total = total - value if value < previous else total + value
+        previous = max(previous, value)
+    return total or None
+
+
+def int_to_roman(value: int) -> str:
+    result = []
+    remaining = value
+    for magnitude, symbol in _ROMAN_NUMERALS:
+        count, remaining = divmod(remaining, magnitude)
+        result.append(symbol * count)
+    return "".join(result)
+
+
+def numeral_value(token: str | None, style: NumberingStyle | None) -> int | None:
+    """The integer value of a caption number, honouring its detected style --
+    `"4"` (arabic) and `"IV"` (roman) both mean 4, but a bare digit string
+    misread as roman (or vice versa) must not silently produce a value."""
+    if token is None:
+        return None
+    if style is NumberingStyle.ARABIC and token.isdigit():
+        return int(token)
+    if style is NumberingStyle.ROMAN:
+        return roman_to_int(token)
+    return None
+
+
 def _is_paragraph(el: Any) -> bool:
     return el is not None and etree.QName(el).localname == "p"
 
@@ -120,4 +164,7 @@ __all__ = [
     "find_citing_paragraph_ids",
     "find_figure_caption",
     "find_table_caption",
+    "int_to_roman",
+    "numeral_value",
+    "roman_to_int",
 ]
