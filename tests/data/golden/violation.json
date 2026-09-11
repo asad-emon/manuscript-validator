@@ -1,0 +1,10 @@
+{
+  "rule_id": "title-font-size",
+  "severity": "high",
+  "section": "title",
+  "paragraph_id": "p0001",
+  "expected": "font_size_pt == 14",
+  "found": "font_size_pt == 12",
+  "auto_fixable": true,
+  "status": "fixed"
+}

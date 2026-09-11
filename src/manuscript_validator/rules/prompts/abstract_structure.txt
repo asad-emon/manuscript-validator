@@ -1,0 +1,11 @@
+Given this abstract text, verify it follows this exact sequence:
+Introduction/Background -> Objectives -> "methods and materials" (this exact
+phrase, not "materials and methods") -> Results -> Conclusion -> [line break]
+-> Keywords.
+
+Judge only what the supplied text shows. Do not infer missing sections.
+
+Abstract text:
+"""
+{abstract_text}
+"""

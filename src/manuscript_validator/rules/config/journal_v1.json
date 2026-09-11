@@ -1,0 +1,81 @@
+{
+  "ruleset_id": "journal_v1",
+  "ruleset_version": "0.1.0",
+  "journal_name": "Journal template v1",
+  "section_order": [
+    "title", "author", "abstract", "affiliation", "introduction",
+    "methods_and_materials", "result", "discussion", "conclusion",
+    "conflict_of_interest", "funding", "acknowledgement", "references"
+  ],
+  "required_sections": [
+    "title", "author", "abstract", "affiliation", "introduction",
+    "methods_and_materials", "result", "discussion", "conclusion", "references"
+  ],
+  "optional_sections": [
+    "acknowledgement", "funding", "conflict_of_interest",
+    "corresponding_author_address"
+  ],
+  "section_synonyms": {
+    "introduction": ["introduction", "background", "introduction and background"],
+    "methods_and_materials": [
+      "methods and materials", "materials and methods", "methodology",
+      "subjects and methods", "patients and methods", "study design"
+    ],
+    "result": ["result", "results", "results and findings", "findings"],
+    "discussion": ["discussion"],
+    "conclusion": ["conclusion", "conclusions"],
+    "conflict_of_interest": [
+      "conflict of interest", "conflicts of interest", "competing interests",
+      "declaration of interest", "disclosure"
+    ],
+    "funding": ["funding", "funding statement", "financial support", "source of funding"],
+    "acknowledgement": [
+      "acknowledgement", "acknowledgment", "acknowledgements", "acknowledgments"
+    ],
+    "references": ["references", "reference", "bibliography", "literature cited"],
+    "corresponding_author_address": [
+      "corresponding author", "correspondence", "address for correspondence"
+    ]
+  },
+  "defaults": { "severity": "medium" },
+  "rules": [
+    {
+      "rule_id": "title-size",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["title"],
+      "selector": { "node_type": "run", "scope": "every" },
+      "condition": { "attribute": "font_size_pt", "operator": "==", "value": 14 },
+      "severity": "high",
+      "auto_fixable": true,
+      "fix_action": "set_font_size",
+      "fix_params": { "font_size_pt": 14 },
+      "priority": 10,
+      "expected_repr": "font_size_pt == 14",
+      "message": "Title must be font size 14 pt."
+    },
+    {
+      "rule_id": "title-wordlimit",
+      "category": "structure",
+      "check_type": "deterministic",
+      "applies_to_section": ["title"],
+      "selector": { "node_type": "paragraph", "scope": "every" },
+      "condition": { "attribute": "text", "operator": "word_count_lte", "value": 25 },
+      "severity": "medium",
+      "auto_fixable": false,
+      "expected_repr": "word count <= 25",
+      "message": "Title must be 25 words or fewer; shorten it manually."
+    },
+    {
+      "rule_id": "abstract-structure",
+      "category": "structure",
+      "check_type": "semantic",
+      "applies_to_section": ["abstract"],
+      "selector": { "node_type": "section_text" },
+      "prompt_file": "prompts/abstract_structure.txt",
+      "prompt_vars": ["abstract_text"],
+      "severity": "high",
+      "message": "Abstract must run Introduction, Objectives, \"methods and materials\", Results, Conclusion, then Keywords."
+    }
+  ]
+}

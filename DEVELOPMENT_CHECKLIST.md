@@ -50,15 +50,19 @@ Repo tree, typed module stubs, installable package.
 - **Done when:** `pip install -e ".[dev]"` succeeds · `pytest` passes a smoke test importing every package · `ruff check` and `mypy --strict src/` clean · `python -m manuscript_validator.cli --help` prints usage
 - **Verified 2026-09-11:** 104 tests pass · ruff clean · mypy strict clean across 54 source files · `--help` and the `manuscript-validator` console script both work
 
-### 2. `[ ]` Domain models + rule-config loader *(M1, ~1.5 d)*
+### 2. `[x]` Domain models + rule-config loader *(M1, ~1.5 d)*
 `models/{ast,violation,audit,report,fix_plan,enums}.py`, `rules/{schema,loader}.py`. Every module signature references these types, so settling them first removes the largest source of rework.
-- `[ ]` `@dataclass(slots=True)` for `Ast`/`Paragraph`/`Run`/`Table`/`Figure` — thousands per document, mutable, cheap; pydantic would re-validate on every assignment for internally-produced data
-- `[ ]` **pydantic** for `Rule`/`Ruleset` (external human-authored JSON — the one place runtime validation earns its keep; discriminated union on `check_type`, free schema export) and `SemanticVerdict` (one definition serving as both `response_schema` and response validator)
-- `[ ]` `@dataclass` `Violation` (mutated in place), `@dataclass(frozen=True)` `AuditEntry`, `ValidationReport` with hand-written `to_dict()` — it's a published file format, keep §5.4's shape under test control
-- `[ ]` Enums as `class Section(str, Enum)` so `json.dumps` works with no encoder
-- `[ ]` `Violation.status` = `open | fixed | fix_failed | needs_review | check_failed | conflict | suppressed` (§5.4 shows only `fixed`; §4.2 adds `check_failed`)
-- `[ ]` Config loads via `importlib.resources`, never `__file__`-relative paths — PyInstaller-onedir safety, far cheaper now than at Task 14
+- `[x]` `@dataclass(slots=True)` for `Ast`/`Paragraph`/`Run`/`Table`/`Figure` — thousands per document, mutable, cheap; pydantic would re-validate on every assignment for internally-produced data
+- `[x]` **pydantic** for `Rule`/`Ruleset` (external human-authored JSON — the one place runtime validation earns its keep; discriminated union on `check_type`, free schema export) and `SemanticVerdict` (one definition serving as both `response_schema` and response validator)
+- `[x]` `@dataclass` `Violation` (mutated in place), `@dataclass(frozen=True)` `AuditEntry`, `ValidationReport` with hand-written `to_dict()` — it's a published file format, keep §5.4's shape under test control
+- `[x]` Enums as `class Section(str, Enum)` so `json.dumps` works with no encoder
+- `[x]` `Violation.status` = `open | fixed | fix_failed | needs_review | check_failed | conflict | suppressed` (§5.4 shows only `fixed`; §4.2 adds `check_failed`)
+- `[x]` Config loads via `importlib.resources`, never `__file__`-relative paths — PyInstaller-onedir safety, far cheaper now than at Task 14. Guarded by a test reading the loader's parsed AST for a `__file__` reference
+- `[x]` `extra="forbid"` on rule models, so a typo'd key fails rather than silently defaulting and disabling a rule with no visible symptom
+- `[x]` `FixOp.attribute` maps each action to the attribute it writes — the grouping key Task 8's conflict detector needs
+- `[x]` 3-rule `journal_v1.json` stub + `abstract_structure.txt` prompt, enough to exercise the loader end to end. **Task 6 replaces this with the full ~38-rule config**
 - **Done when:** `to_dict()` output matches §5.4/§5.5 key-for-key against committed golden files · six deliberately-broken configs each raise `RuleConfigError` naming the rule_id and offending field
+- **Verified 2026-09-11:** 145 tests pass (41 new) · ruff and mypy --strict clean · golden files transcribed from the spec, not generated from the models under test
 
 ### 3. `[ ]` Fixture factory + real-document intake *(M2, ~1.5 d)*
 `tests/fixtures/factory.py` — a `ManuscriptBuilder` emitting a compliant manuscript in memory, plus `violating(rule_id)` perturbing exactly one attribute of that baseline. The only way to honour §12's "violates exactly that rule and no other", and it keeps fixtures as readable code diffs rather than opaque binary zips.
@@ -223,14 +227,14 @@ Three files, because the `SecretBox` seam keeps DPAPI to ~60 lines.
 | Phase | Tasks | Done | Partial | Remaining |
 |---|---|---|---|---|
 | 0 — Partial implementation tracking | 0 | 0 | 0 | 0 |
-| 1 — Foundation | 3 | 1 | 0 | 2 |
+| 1 — Foundation | 3 | 2 | 0 | 1 |
 | 2 — Document understanding | 2 | 0 | 0 | 2 |
 | 3 — Validation | 2 | 0 | 0 | 2 |
 | 4 — Correction & output | 4 | 0 | 0 | 4 |
 | 5 — Semantic layer | 1 | 0 | 0 | 1 |
 | 6 — Delivery surfaces | 2 | 0 | 0 | 2 |
 | 7 — Windows packaging & release | 2 | 0 | 0 | 2 |
-| **Total** | **16** | **1** | **0** | **15** |
+| **Total** | **16** | **2** | **0** | **14** |
 
 Estimate ≈37 dev-days. Only Task 15 requires the Windows machine.
 
@@ -271,5 +275,6 @@ QT_QPA_PLATFORM=offscreen pytest -m gui -q
 
 - 2026-09-11 — Checklist created from `technical_specification.md` and the approved development plan. 16 tasks across 7 phases, none started. Four spec corrections adopted before implementation (C1–C4 in the Spec alignment block) plus three unaddressed risks documented. User decisions locked: Windows VM available for Phase 7, real `.docx` samples to be supplied for Task 3, CLI before GUI, caption repositioning and title-case flag-only in v1, PySide6 over PyQt.
 - 2026-09-11 — Task 1 complete. Package scaffold, `pyproject.toml` with the gui/windows/dev dependency split, typed stubs for every pipeline module carrying the design constraints in their docstrings, and `docs/decisions.md` with C1–C5 plus the §6 deviation table. Also landed `errors.py`, `logging_setup.py` with the §13 key-redaction filter, and three guard tests (module imports, Qt-freedom, C1 `deepcopy` ban). 104 tests pass; ruff and mypy --strict clean. Added C5 (resources load via `importlib.resources`) during the work — not a spec deviation, but a cross-module constraint worth recording before Task 2 writes the loader.
+- 2026-09-11 — Task 2 complete. Domain models (AST, Violation, AuditEntry, ValidationReport, FixPlan, enums) and the pydantic rule schema and loader. Serialisation is asserted against golden files transcribed from §5.4/§5.5 rather than generated from the models, so the test proves conformance to the spec rather than self-consistency. Extension fields are emitted only when set, keeping a plain violation byte-identical to the spec's example. Loader reports malformed configs with the rule_id and field, and strips pydantic's union class names from messages — someone editing JSON never sees a class. 145 tests pass.
 
 _Last updated: 2026-09-11_

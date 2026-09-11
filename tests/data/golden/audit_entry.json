@@ -1,0 +1,8 @@
+{
+  "rule_id": "title-font-size",
+  "paragraph_id": "p0001",
+  "action": "set_font_size",
+  "before": { "font_size_pt": 12 },
+  "after": { "font_size_pt": 14 },
+  "timestamp": "2026-09-03T10:00:02Z"
+}
