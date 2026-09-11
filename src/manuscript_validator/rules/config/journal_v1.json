@@ -16,6 +16,7 @@
     "corresponding_author_address"
   ],
   "section_synonyms": {
+    "abstract": ["abstract", "summary"],
     "introduction": ["introduction", "background", "introduction and background"],
     "methods_and_materials": [
       "methods and materials", "materials and methods", "methodology",
