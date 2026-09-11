@@ -38,15 +38,17 @@ Greenfield. The repo contains only `technical_specification.md` and this checkli
 
 Nothing downstream can be tested without these. Fixtures come before the parser because a parser cannot be unit-tested without documents.
 
-### 1. `[ ]` Scaffolding & toolchain *(M0, ~0.5 d)*
+### 1. `[x]` Scaffolding & toolchain *(M0, ~0.5 d)*
 Repo tree, typed module stubs, installable package.
-- `[ ]` `src/` layout so tests import the *installed* package — catches a missing `__init__.py` or an uncollected `journal_v1.json` on day one rather than during the PyInstaller build
-- `[ ]` `pyproject.toml` with `[project.optional-dependencies]` splitting `gui` (PySide6), `windows` (pywin32), `dev` (pytest, pytest-mock, pytest-cov, ruff, mypy, pyinstaller) so Linux never installs pywin32
-- `[ ]` `constraints.txt` so the Windows build resolves to the versions Linux tested
-- `[ ]` `parser/` and `segmenter/` as regular packages with explicit `__init__.py` — not single modules as §11 implies, not namespace packages (PyInstaller's module graph has blind spots with those)
-- `[ ]` pytest markers `live`, `windows`, `gui`, `slow`; `addopts = -m "not live and not windows"` so the default run is offline and platform-clean
-- `[ ]` `docs/decisions.md` recording C1–C4 and every §6 deviation
+- `[x]` `src/` layout so tests import the *installed* package — catches a missing `__init__.py` or an uncollected `journal_v1.json` on day one rather than during the PyInstaller build
+- `[x]` `pyproject.toml` with `[project.optional-dependencies]` splitting `gui` (PySide6), `windows` (pywin32), `dev` (pytest, pytest-mock, pytest-cov, ruff, mypy, pyinstaller) so Linux never installs pywin32
+- `[x]` `constraints.txt` so the Windows build resolves to the versions Linux tested
+- `[x]` `parser/` and `segmenter/` as regular packages with explicit `__init__.py` — not single modules as §11 implies, not namespace packages (PyInstaller's module graph has blind spots with those)
+- `[x]` pytest markers `live`, `windows`, `gui`, `slow`; `addopts = -m "not live and not windows"` so the default run is offline and platform-clean
+- `[x]` `docs/decisions.md` recording C1–C4 and every §6 deviation
+- `[x]` Beyond scope, because each was small and self-contained: `errors.py` exception hierarchy · `logging_setup.py` with the §13 API-key redaction filter and its tests · `test_no_qt_imports.py` (Task 14's gate, in place before there is any Qt to leak) · `test_decision_guards.py` enforcing C1's `deepcopy` ban in `autofix/`
 - **Done when:** `pip install -e ".[dev]"` succeeds · `pytest` passes a smoke test importing every package · `ruff check` and `mypy --strict src/` clean · `python -m manuscript_validator.cli --help` prints usage
+- **Verified 2026-09-11:** 104 tests pass · ruff clean · mypy strict clean across 54 source files · `--help` and the `manuscript-validator` console script both work
 
 ### 2. `[ ]` Domain models + rule-config loader *(M1, ~1.5 d)*
 `models/{ast,violation,audit,report,fix_plan,enums}.py`, `rules/{schema,loader}.py`. Every module signature references these types, so settling them first removes the largest source of rework.
@@ -221,14 +223,14 @@ Three files, because the `SecretBox` seam keeps DPAPI to ~60 lines.
 | Phase | Tasks | Done | Partial | Remaining |
 |---|---|---|---|---|
 | 0 — Partial implementation tracking | 0 | 0 | 0 | 0 |
-| 1 — Foundation | 3 | 0 | 0 | 3 |
+| 1 — Foundation | 3 | 1 | 0 | 2 |
 | 2 — Document understanding | 2 | 0 | 0 | 2 |
 | 3 — Validation | 2 | 0 | 0 | 2 |
 | 4 — Correction & output | 4 | 0 | 0 | 4 |
 | 5 — Semantic layer | 1 | 0 | 0 | 1 |
 | 6 — Delivery surfaces | 2 | 0 | 0 | 2 |
 | 7 — Windows packaging & release | 2 | 0 | 0 | 2 |
-| **Total** | **16** | **0** | **0** | **16** |
+| **Total** | **16** | **1** | **0** | **15** |
 
 Estimate ≈37 dev-days. Only Task 15 requires the Windows machine.
 
@@ -268,5 +270,6 @@ QT_QPA_PLATFORM=offscreen pytest -m gui -q
 ## Notes
 
 - 2026-09-11 — Checklist created from `technical_specification.md` and the approved development plan. 16 tasks across 7 phases, none started. Four spec corrections adopted before implementation (C1–C4 in the Spec alignment block) plus three unaddressed risks documented. User decisions locked: Windows VM available for Phase 7, real `.docx` samples to be supplied for Task 3, CLI before GUI, caption repositioning and title-case flag-only in v1, PySide6 over PyQt.
+- 2026-09-11 — Task 1 complete. Package scaffold, `pyproject.toml` with the gui/windows/dev dependency split, typed stubs for every pipeline module carrying the design constraints in their docstrings, and `docs/decisions.md` with C1–C5 plus the §6 deviation table. Also landed `errors.py`, `logging_setup.py` with the §13 key-redaction filter, and three guard tests (module imports, Qt-freedom, C1 `deepcopy` ban). 104 tests pass; ruff and mypy --strict clean. Added C5 (resources load via `importlib.resources`) during the work — not a spec deviation, but a cross-module constraint worth recording before Task 2 writes the loader.
 
 _Last updated: 2026-09-11_

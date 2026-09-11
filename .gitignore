@@ -1,0 +1,21 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Never commit a real Gemini API key. The settings store writes this file.
+config.json
+*.local.json
+
+# Fixtures materialised for manual inspection in Word.
+tools/_out/

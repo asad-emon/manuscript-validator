@@ -1,0 +1,8 @@
+# Pinned resolution so the Windows build machine gets the versions the Linux
+# box tested. Regenerate with: pip freeze > constraints.txt
+python-docx==1.2.0
+lxml==5.3.1
+pydantic==2.13.4
+platformdirs==4.4.0
+tenacity==9.1.4
+google-genai==2.18.0
