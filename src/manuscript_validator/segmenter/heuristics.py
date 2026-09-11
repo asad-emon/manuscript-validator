@@ -1,21 +1,32 @@
 """Positional fallback for front matter.
 
-Title, author, and affiliation carry no heading at all -- there is nothing for
+Title carries no heading at all -- there is nothing for
 `headings.evaluate_heading` to match against -- and abstract's own heading
 ("Abstract") is too short and unstyled to reliably clear the structural score
-on its own, so all four are resolved by a scored state machine over the
+on its own, so both are resolved by a scored state machine over the
 paragraphs preceding the first recognised *body* heading, not by fixed
 indices: a manuscript that inserts an extra affiliation line, or omits the
 "Abstract" heading text entirely, must not shift every subsequent label.
 
-Order within front matter (title, then author, then abstract, then
-affiliation) is treated as fixed for this template -- multi-journal support is
-out of scope for v1 (spec section 2) -- but *where each one ends* is decided
-by content signals: an explicit "Abstract"/"Summary" heading anchors the
-abstract block, and an ORCID/email/superscript-numeral signal anchors
-affiliation. Absent those signals, the module falls back to the narrowest
-reasonable default (one paragraph for author, the last front-matter paragraph
-for affiliation) rather than guessing further.
+Author and affiliation are **not** separated positionally at all. Five
+real-world submissions supplied against this task (`tests/fixtures/real/`)
+all place institutional/ORCID/email content for each author *directly under
+the author line, before the abstract* -- not after it, as the compliant
+fixture (built from the spec's assumed template) does. An earlier version of
+this module defaulted "whatever front-matter paragraph has no stronger signal"
+to affiliation, which produced a real false positive: a single-paragraph
+abstract immediately followed by a "Keywords:" line had its abstract body
+paragraph mislabelled affiliation, purely because it happened to be the last
+paragraph before an already-claimed keywords line. Content signals (an
+ORCID/email string, or a paragraph opening with a superscript digit -- the
+standard numbered-affiliation-footnote convention) are scanned across the
+*entire* front matter, before and after the abstract heading alike, and only
+a positive hit is ever labelled affiliation. Everything else in the author
+region defaults to author; everything else after the abstract heading
+defaults to abstract. Nothing is labelled affiliation on position alone --
+if no signal fires anywhere, affiliation simply is not detected, and
+`SegmentationResult.missing_sections` reports that honestly rather than
+`resolve_front_matter` fabricating a guess.
 """
 
 from __future__ import annotations
@@ -32,6 +43,7 @@ from manuscript_validator.segmenter.headings import evaluate_heading
 FRONT_MATTER_SECTIONS = (Section.TITLE, Section.AUTHOR, Section.ABSTRACT, Section.AFFILIATION)
 
 _AFFILIATION_SCORE_THRESHOLD = 2
+_KEYWORDS_PREFIXES = ("keywords", "key words", "keyword")
 
 
 @dataclass(frozen=True)
@@ -54,15 +66,36 @@ def _author_line_score(paragraph: Paragraph) -> int:
     return score
 
 
+def _looks_like_keywords(paragraph: Paragraph) -> bool:
+    return paragraph.text.strip().lower().startswith(_KEYWORDS_PREFIXES)
+
+
 def _affiliation_score(paragraph: Paragraph) -> int:
     lowered = paragraph.text.lower()
     score = 0
     if "orcid" in lowered or "email" in lowered or "@" in paragraph.text:
         score += 3
     first_run = paragraph.runs[0] if paragraph.runs else None
+    # A paragraph opening on a bare superscript digit is, on its own, the
+    # standard numbered-affiliation-footnote convention -- real samples carry
+    # it with no ORCID/email in sight, so it must clear the threshold alone.
     if first_run is not None and first_run.superscript and first_run.text.strip().isdigit():
-        score += 1
+        score += 2
     return score
+
+
+def _classify_non_heading(
+    paragraph: Paragraph, *, default: Section, default_confidence: float
+) -> FrontMatterAssignment:
+    if _looks_like_keywords(paragraph):
+        return FrontMatterAssignment(Section.ABSTRACT, 0.9, SectionSource.POSITIONAL)
+    if _affiliation_score(paragraph) >= _AFFILIATION_SCORE_THRESHOLD:
+        return FrontMatterAssignment(Section.AFFILIATION, 0.9, SectionSource.POSITIONAL)
+    if default is Section.AUTHOR:
+        score = _author_line_score(paragraph)
+        confidence = 0.5 + 0.1 * min(score, 4)
+        return FrontMatterAssignment(Section.AUTHOR, confidence, SectionSource.POSITIONAL)
+    return FrontMatterAssignment(default, default_confidence, SectionSource.POSITIONAL)
 
 
 def resolve_front_matter(
@@ -89,35 +122,20 @@ def resolve_front_matter(
             )
             break
 
-    author_end = (
-        abstract_heading_idx if abstract_heading_idx is not None else min(2, len(non_blank))
-    )
-    for paragraph in non_blank[1:author_end]:
-        score = _author_line_score(paragraph)
-        assignments[paragraph.id] = FrontMatterAssignment(
-            Section.AUTHOR, 0.5 + 0.1 * min(score, 4), SectionSource.POSITIONAL
+    author_region_end = abstract_heading_idx if abstract_heading_idx is not None else len(non_blank)
+    for paragraph in non_blank[1:author_region_end]:
+        assignments[paragraph.id] = _classify_non_heading(
+            paragraph, default=Section.AUTHOR, default_confidence=0.5
         )
 
     remainder_start = (
-        (abstract_heading_idx + 1) if abstract_heading_idx is not None else author_end
+        (abstract_heading_idx + 1) if abstract_heading_idx is not None else author_region_end
     )
-    remainder = non_blank[remainder_start:]
-    affiliation_scores = (_affiliation_score(p) for p in remainder)
-    affiliation_idx = next(
-        (i for i, score in enumerate(affiliation_scores) if score >= _AFFILIATION_SCORE_THRESHOLD),
-        None,
-    )
-    boundary = affiliation_idx if affiliation_idx is not None else max(len(remainder) - 1, 0)
-    for i, paragraph in enumerate(remainder):
-        if i < boundary:
-            assignments[paragraph.id] = FrontMatterAssignment(
-                Section.ABSTRACT, 0.6, SectionSource.POSITIONAL
-            )
-        else:
-            confidence = 0.9 if i == affiliation_idx else 0.6
-            assignments[paragraph.id] = FrontMatterAssignment(
-                Section.AFFILIATION, confidence, SectionSource.POSITIONAL
-            )
+    for paragraph in non_blank[remainder_start:]:
+        assignments[paragraph.id] = _classify_non_heading(
+            paragraph, default=Section.ABSTRACT, default_confidence=0.6
+        )
+
     return assignments
 
 

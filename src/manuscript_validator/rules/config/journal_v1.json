@@ -19,7 +19,7 @@
     "abstract": ["abstract", "summary"],
     "introduction": ["introduction", "background", "introduction and background"],
     "methods_and_materials": [
-      "methods and materials", "materials and methods", "methodology",
+      "methods and materials", "materials and methods", "methods", "methodology",
       "subjects and methods", "patients and methods", "study design"
     ],
     "result": ["result", "results", "results and findings", "findings"],

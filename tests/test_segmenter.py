@@ -149,9 +149,13 @@ def test_resolve_front_matter_assigns_title_author_abstract_affiliation() -> Non
     assert assignments["p6"].section is Section.AFFILIATION
 
 
-def test_resolve_front_matter_falls_back_positionally_without_signals() -> None:
-    # No "Abstract" heading, no ORCID/email in the last paragraph: the state
-    # machine still produces a full, ordered assignment via fallbacks.
+def test_resolve_front_matter_never_fabricates_affiliation_without_a_signal() -> None:
+    """No "Abstract" heading and no ORCID/email/superscript-numeral anywhere:
+    affiliation must not be guessed from position. An earlier version of this
+    heuristic defaulted "whatever paragraph comes last" to affiliation, which
+    produced a real false positive on a genuine sample manuscript (a
+    single-paragraph abstract immediately followed by a Keywords line had its
+    abstract body mislabelled affiliation)."""
     title = Paragraph(id="p1", text="A Study Of Something Important")
     author = Paragraph(id="p2", text="Jane Doe")
     body = Paragraph(id="p3", text="This study evaluates something over several words.")
@@ -159,9 +163,46 @@ def test_resolve_front_matter_falls_back_positionally_without_signals() -> None:
 
     assignments = resolve_front_matter([title, author, body, last], {})
     assert assignments["p1"].section is Section.TITLE
+    # With no abstract heading and no affiliation signal anywhere, there is no
+    # basis to say where "author" ends and "abstract" begins either -- every
+    # remaining paragraph defaults to author rather than a guessed split.
+    # What matters is that nothing is labelled affiliation on position alone.
+    assert {a.section for a in assignments.values()} == {Section.TITLE, Section.AUTHOR}
+
+
+def test_resolve_front_matter_detects_affiliation_before_the_abstract_heading() -> None:
+    """Real-world discovery (`tests/fixtures/real/`): every sample submission
+    places each author's institutional/ORCID/email line directly under the
+    author names, *before* the abstract -- not after it, as the compliant
+    fixture (built from the spec's assumed template) does. Affiliation must be
+    recognised by content signal wherever it falls, not only in the region
+    after the abstract heading."""
+    title = Paragraph(id="p1", text="A Study Of Something Important")
+    author = Paragraph(id="p2", text="Jane Doe1")
+    affiliation = Paragraph(id="p3", text="Dept of Medicine. Email: a@b.com. ORCID: 0000.")
+    abstract_heading = Paragraph(id="p4", text="Abstract")
+    abstract_body = Paragraph(id="p5", text="Background: this study evaluates something.")
+
+    synonyms = {Section.ABSTRACT: ["abstract"]}
+    paragraphs = [title, author, affiliation, abstract_heading, abstract_body]
+    assignments = resolve_front_matter(paragraphs, synonyms)
+
     assert assignments["p2"].section is Section.AUTHOR
-    assert assignments["p3"].section is Section.ABSTRACT
-    assert assignments["p4"].section is Section.AFFILIATION
+    assert assignments["p3"].section is Section.AFFILIATION
+    assert assignments["p4"].section is Section.ABSTRACT
+    assert assignments["p5"].section is Section.ABSTRACT
+
+
+def test_resolve_front_matter_detects_leading_superscript_digit_with_no_orcid_or_email() -> None:
+    """Another real-world pattern: a numbered-affiliation-footnote line with
+    no ORCID/email string at all -- just a bare superscript digit opening the
+    paragraph. Must clear the affiliation threshold on that signal alone."""
+    p = Paragraph(id="p1", text="1Department of Medicine, Example Hospital, Some City")
+    p.runs = [_run("1", superscript=True), _run("Department of Medicine, Example Hospital")]
+    assignments = resolve_front_matter(
+        [Paragraph(id="p0", text="Title"), p], {}
+    )
+    assert assignments["p1"].section is Section.AFFILIATION
 
 
 def test_resolve_front_matter_on_empty_input() -> None:
