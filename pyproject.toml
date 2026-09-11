@@ -69,6 +69,6 @@ mypy_path = "src"
 packages = ["manuscript_validator"]
 
 [[tool.mypy.overrides]]
-# Neither ships type stubs.
-module = ["docx.*", "win32crypt.*"]
+# None of these ship type stubs.
+module = ["docx.*", "lxml.*", "win32crypt.*"]
 ignore_missing_imports = true
