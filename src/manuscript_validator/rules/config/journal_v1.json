@@ -448,7 +448,7 @@
       "selector": {
         "node_type": "run",
         "scope": "every",
-        "filter": { "attribute": "text", "operator": "matches_regex", "value": "^\\[\\d+\\]$" }
+        "filter": { "attribute": "text", "operator": "matches_regex", "value": "^[\\[\\(]\\d+[\\]\\)]$" }
       },
       "condition": { "attribute": "superscript", "operator": "==", "value": true },
       "severity": "high",

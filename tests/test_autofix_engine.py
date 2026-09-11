@@ -85,16 +85,17 @@ def test_fix_resolves_the_violation_it_was_planned_for(rule_id: str) -> None:
 
 
 def test_plan_fixes_never_touches_the_source_document() -> None:
-    """`plan_fixes` takes violations and a ruleset -- no document parameter
-    exists for it to mutate, which is what makes "input AST provably
-    unmutated" true by construction rather than by convention."""
+    """`plan_fixes` takes violations and a ruleset -- no document or AST
+    parameter exists for it to mutate, which is what makes "input AST
+    provably unmutated" true by construction rather than by convention."""
     doc, _handles = violating("title-size")
     source_bytes = _roundtrip_bytes(doc)
-    _ast, violations = _validate(source_bytes)
+    ast, violations = _validate(source_bytes)
+    ast_snapshot_before = ast.to_dict()
 
     plan_fixes(violations, RULESET)
 
-    assert source_bytes == _roundtrip_bytes(Document(BytesIO(source_bytes)))
+    assert ast.to_dict() == ast_snapshot_before
 
 
 def test_apply_fix_plan_produces_audit_entries_matching_spec_5_5_shape() -> None:
