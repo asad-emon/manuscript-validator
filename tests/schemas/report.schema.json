@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://manuscript-validator.internal/schemas/report.schema.json",
+  "title": "ValidationReport",
+  "description": "Spec section 5.4. Locks the published report shape so it changes only when someone decides to change it, not when a library's serialisation defaults shift.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["document_id", "ruleset_version", "validated_at", "summary", "violations"],
+  "properties": {
+    "document_id": { "type": "string" },
+    "ruleset_version": { "type": "string" },
+    "validated_at": { "type": "string", "format": "date-time" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "auto_fixed", "needs_review"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "auto_fixed": { "type": "integer", "minimum": 0 },
+        "needs_review": { "type": "integer", "minimum": 0 },
+        "check_failed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/violation" }
+    },
+    "missing_sections": { "type": "array", "items": { "type": "string" } },
+    "unchecked_scopes": { "type": "array", "items": { "type": "string" } },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "violation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "severity", "section", "paragraph_id", "expected", "found", "auto_fixable", "status"],
+      "properties": {
+        "rule_id": { "type": "string" },
+        "severity": { "enum": ["high", "medium", "low"] },
+        "section": {
+          "type": ["string", "null"],
+          "enum": [
+            "title", "author", "abstract", "affiliation", "introduction",
+            "methods_and_materials", "result", "discussion", "conclusion",
+            "conflict_of_interest", "funding", "acknowledgement", "references",
+            "corresponding_author_address", "unknown", null
+          ]
+        },
+        "paragraph_id": { "type": ["string", "null"] },
+        "expected": { "type": "string" },
+        "found": { "type": "string" },
+        "auto_fixable": { "type": "boolean" },
+        "status": {
+          "enum": [
+            "open", "fixed", "fix_failed", "needs_review",
+            "check_failed", "conflict", "suppressed"
+          ]
+        },
+        "run_indices": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "anchor_paragraph_id": { "type": "string" },
+        "explanation": { "type": "string" },
+        "suggested_fix": { "type": "string" },
+        "failure_reason": { "type": "string" },
+        "message": { "type": "string" },
+        "details": { "type": "object" }
+      }
+    }
+  }
+}

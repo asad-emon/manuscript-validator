@@ -1,0 +1,11 @@
+Given this reference list entry, verify it follows the Vancouver citation
+system: numbered, listing authors as "Surname Initials" separated by commas,
+followed by the article title, journal abbreviation, year, volume, issue, and
+page range.
+
+Judge only what the supplied text shows. Do not infer missing fields.
+
+Reference entry:
+"""
+{reference_text}
+"""

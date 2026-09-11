@@ -1,0 +1,11 @@
+Given this affiliation text from a manuscript, verify it contains all of the
+following for the author(s) listed: a professional designation (e.g. job
+title or academic rank), a place (institution, city, and country), an email
+address, and an ORCID identifier.
+
+Judge only what the supplied text shows. Do not infer missing fields.
+
+Affiliation text:
+"""
+{affiliation_text}
+"""

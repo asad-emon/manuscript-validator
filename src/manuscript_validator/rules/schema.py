@@ -67,12 +67,22 @@ class Condition(StrictModel):
 
 
 class Selector(StrictModel):
-    """Which nodes within the matched sections a rule applies to."""
+    """Which nodes within the matched sections a rule applies to.
+
+    Two independent filters, because "which paragraphs" and "which runs
+    within a paragraph" are different questions. `paragraph_filter` narrows
+    the paragraphs in scope (e.g. only the heading paragraph of a section,
+    via `section_source == "heading"`, or only a table's caption paragraph)
+    before either the paragraph itself or its runs are checked.
+    `filter` narrows further, at run granularity, for `node_type: run` only
+    (e.g. runs whose text is a bare affiliation numeral) -- a table-cell
+    scope and a numeral-only scope are both real rules (Task 6) and neither
+    is expressible by a single filter.
+    """
 
     node_type: NodeType = NodeType.RUN
     scope: SelectorScope = SelectorScope.EVERY
-    #: Narrows the selection before the condition is evaluated, reusing the
-    #: same grammar (e.g. runs whose text is a bare affiliation numeral).
+    paragraph_filter: Condition | None = None
     filter: Condition | None = None
 
 
@@ -85,6 +95,10 @@ class BaseRule(StrictModel):
     selector: Selector = Field(default_factory=Selector)
     on_missing_section: OnMissingSection = OnMissingSection.SKIP
     priority: int = 100
+    #: Regexes (case-insensitive) that exclude a matching paragraph from
+    #: selection entirely -- e.g. the abstract word-count limit excludes the
+    #: "Keywords:" line by default, per spec section 6's implementation note.
+    exclude_patterns: list[str] = Field(default_factory=list)
     #: Human-readable form of the expectation, used verbatim in the report's
     #: `expected` field when present.
     expected_repr: str = ""

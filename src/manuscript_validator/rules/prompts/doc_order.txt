@@ -1,0 +1,14 @@
+Given the section labels found in this manuscript, in the order they appear,
+verify they follow this exact sequence (Acknowledgement is optional and may
+be omitted, but if present must sit where shown):
+
+Title -> Author -> Abstract -> Affiliation -> Introduction ->
+Methods and Materials -> Result -> Discussion -> Conclusion ->
+Conflict of Interest -> Funding -> Acknowledgement (optional) -> References
+
+Judge only the order given below. Do not infer sections that are not listed.
+
+Section order found:
+"""
+{section_order}
+"""

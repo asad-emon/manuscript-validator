@@ -1,6 +1,6 @@
 {
   "ruleset_id": "journal_v1",
-  "ruleset_version": "0.1.0",
+  "ruleset_version": "1.0.0",
   "journal_name": "Journal template v1",
   "section_order": [
     "title", "author", "abstract", "affiliation", "introduction",
@@ -41,6 +41,33 @@
   "defaults": { "severity": "medium" },
   "rules": [
     {
+      "rule_id": "global-font",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": [],
+      "selector": { "node_type": "run", "scope": "every" },
+      "condition": { "attribute": "font_name", "operator": "==", "value": "Times New Roman" },
+      "severity": "high",
+      "auto_fixable": true,
+      "fix_action": "set_font",
+      "fix_params": { "font_name": "Times New Roman" },
+      "priority": 5,
+      "expected_repr": "font_name == 'Times New Roman'",
+      "message": "All text must use Times New Roman."
+    },
+    {
+      "rule_id": "doc-order",
+      "category": "structure",
+      "check_type": "semantic",
+      "applies_to_section": [],
+      "selector": { "node_type": "document", "scope": "first" },
+      "prompt_file": "prompts/doc_order.txt",
+      "prompt_vars": ["section_order"],
+      "severity": "high",
+      "priority": 200,
+      "message": "Sections must appear in order: Title, Author, Abstract, Affiliation, Introduction, Methods and Materials, Result, Discussion, Conclusion, Conflict of Interest, Funding, Acknowledgement (optional), References."
+    },
+    {
       "rule_id": "title-size",
       "category": "style",
       "check_type": "deterministic",
@@ -56,6 +83,34 @@
       "message": "Title must be font size 14 pt."
     },
     {
+      "rule_id": "title-bold",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["title"],
+      "selector": { "node_type": "run", "scope": "every" },
+      "condition": { "attribute": "bold", "operator": "==", "value": true },
+      "severity": "high",
+      "auto_fixable": true,
+      "fix_action": "set_bold",
+      "fix_params": { "bold": true },
+      "priority": 10,
+      "expected_repr": "bold == true",
+      "message": "Title must be bold."
+    },
+    {
+      "rule_id": "title-case",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["title"],
+      "selector": { "node_type": "paragraph", "scope": "every" },
+      "condition": { "attribute": "text", "operator": "is_title_case" },
+      "severity": "medium",
+      "auto_fixable": false,
+      "priority": 10,
+      "expected_repr": "each word capitalized (title case)",
+      "message": "Title should be in title case. Flagged for manual review (locked decision: not auto-fixed in v1)."
+    },
+    {
       "rule_id": "title-wordlimit",
       "category": "structure",
       "check_type": "deterministic",
@@ -64,8 +119,128 @@
       "condition": { "attribute": "text", "operator": "word_count_lte", "value": 25 },
       "severity": "medium",
       "auto_fixable": false,
+      "priority": 10,
       "expected_repr": "word count <= 25",
       "message": "Title must be 25 words or fewer; shorten it manually."
+    },
+    {
+      "rule_id": "author-bold",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["author"],
+      "selector": { "node_type": "run", "scope": "every" },
+      "condition": { "attribute": "bold", "operator": "==", "value": true },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_bold",
+      "fix_params": { "bold": true },
+      "priority": 10,
+      "expected_repr": "bold == true",
+      "message": "Author names must be bold."
+    },
+    {
+      "rule_id": "author-size",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["author"],
+      "selector": { "node_type": "run", "scope": "every" },
+      "condition": { "attribute": "font_size_pt", "operator": "==", "value": 10 },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_font_size",
+      "fix_params": { "font_size_pt": 10 },
+      "priority": 10,
+      "expected_repr": "font_size_pt == 10",
+      "message": "Author line must be font size 10 pt."
+    },
+    {
+      "rule_id": "author-affiliation-superscript",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["author"],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "filter": { "attribute": "text", "operator": "matches_regex", "value": "^\\d+\\*?$" }
+      },
+      "condition": { "attribute": "superscript", "operator": "==", "value": true },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_superscript",
+      "fix_params": { "superscript": true },
+      "priority": 10,
+      "expected_repr": "superscript == true",
+      "message": "Author affiliation numerals must be superscript."
+    },
+    {
+      "rule_id": "abstract-heading-italic",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["abstract"],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "paragraph_filter": { "attribute": "section_source", "operator": "==", "value": "heading" }
+      },
+      "condition": { "attribute": "italic", "operator": "==", "value": true },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_italic",
+      "fix_params": { "italic": true },
+      "priority": 10,
+      "expected_repr": "italic == true",
+      "message": "The 'Abstract' heading must be italic."
+    },
+    {
+      "rule_id": "abstract-body-italic",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["abstract"],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "paragraph_filter": { "attribute": "section_source", "operator": "!=", "value": "heading" }
+      },
+      "condition": { "attribute": "italic", "operator": "==", "value": true },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_italic",
+      "fix_params": { "italic": true },
+      "priority": 10,
+      "expected_repr": "italic == true",
+      "message": "Abstract body text must be italic."
+    },
+    {
+      "rule_id": "abstract-size",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["abstract"],
+      "selector": { "node_type": "run", "scope": "every" },
+      "condition": { "attribute": "font_size_pt", "operator": "==", "value": 9 },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_font_size",
+      "fix_params": { "font_size_pt": 9 },
+      "priority": 10,
+      "expected_repr": "font_size_pt == 9",
+      "message": "Abstract must be font size 9 pt."
+    },
+    {
+      "rule_id": "abstract-wordlimit",
+      "category": "structure",
+      "check_type": "deterministic",
+      "applies_to_section": ["abstract"],
+      "selector": {
+        "node_type": "section_text",
+        "paragraph_filter": { "attribute": "section_source", "operator": "!=", "value": "heading" }
+      },
+      "condition": { "attribute": "text", "operator": "word_count_lte", "value": 250 },
+      "exclude_patterns": ["^\\s*keywords?\\s*:"],
+      "severity": "medium",
+      "auto_fixable": false,
+      "priority": 10,
+      "expected_repr": "word count <= 250",
+      "message": "Abstract must be 250 words or fewer (excluding the keywords line); shorten it manually."
     },
     {
       "rule_id": "abstract-structure",
@@ -76,7 +251,432 @@
       "prompt_file": "prompts/abstract_structure.txt",
       "prompt_vars": ["abstract_text"],
       "severity": "high",
+      "priority": 200,
       "message": "Abstract must run Introduction, Objectives, \"methods and materials\", Results, Conclusion, then Keywords."
+    },
+    {
+      "rule_id": "abstract-keywords-count",
+      "category": "structure",
+      "check_type": "semantic",
+      "applies_to_section": ["abstract"],
+      "selector": { "node_type": "section_text" },
+      "prompt_file": "prompts/abstract_keywords_count.txt",
+      "prompt_vars": ["keywords_text"],
+      "severity": "medium",
+      "priority": 200,
+      "message": "Abstract must list between 3 and 5 keywords."
+    },
+    {
+      "rule_id": "affiliation-italic",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["affiliation"],
+      "selector": { "node_type": "run", "scope": "every" },
+      "condition": { "attribute": "italic", "operator": "==", "value": true },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_italic",
+      "fix_params": { "italic": true },
+      "priority": 10,
+      "expected_repr": "italic == true",
+      "message": "Affiliation text must be italic."
+    },
+    {
+      "rule_id": "affiliation-size",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["affiliation"],
+      "selector": { "node_type": "run", "scope": "every" },
+      "condition": { "attribute": "font_size_pt", "operator": "==", "value": 7 },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_font_size",
+      "fix_params": { "font_size_pt": 7 },
+      "priority": 10,
+      "expected_repr": "font_size_pt == 7",
+      "message": "Affiliation text must be font size 7 pt."
+    },
+    {
+      "rule_id": "affiliation-content",
+      "category": "structure",
+      "check_type": "semantic",
+      "applies_to_section": ["affiliation"],
+      "selector": { "node_type": "section_text" },
+      "prompt_file": "prompts/affiliation_content.txt",
+      "prompt_vars": ["affiliation_text"],
+      "severity": "medium",
+      "priority": 200,
+      "message": "Affiliation must include designation, place, email, and ORCID."
+    },
+    {
+      "rule_id": "heading-uppercase-literal",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": [
+        "introduction", "methods_and_materials", "result", "discussion", "conclusion",
+        "conflict_of_interest", "funding", "acknowledgement", "references",
+        "corresponding_author_address"
+      ],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "paragraph_filter": { "attribute": "section_source", "operator": "==", "value": "heading" }
+      },
+      "condition": { "attribute": "uppercase_literal", "operator": "==", "value": true },
+      "severity": "high",
+      "auto_fixable": true,
+      "fix_action": "set_uppercase_literal",
+      "fix_params": { "uppercase_literal": true },
+      "priority": 10,
+      "expected_repr": "uppercase_literal == true",
+      "message": "Section headings must be typed in literal uppercase."
+    },
+    {
+      "rule_id": "heading-bold",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": [
+        "introduction", "methods_and_materials", "result", "discussion", "conclusion",
+        "conflict_of_interest", "funding", "acknowledgement", "references",
+        "corresponding_author_address"
+      ],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "paragraph_filter": { "attribute": "section_source", "operator": "==", "value": "heading" }
+      },
+      "condition": { "attribute": "bold", "operator": "==", "value": true },
+      "severity": "high",
+      "auto_fixable": true,
+      "fix_action": "set_bold",
+      "fix_params": { "bold": true },
+      "priority": 10,
+      "expected_repr": "bold == true",
+      "message": "Section headings must be bold."
+    },
+    {
+      "rule_id": "heading-size",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": [
+        "introduction", "methods_and_materials", "result", "discussion", "conclusion",
+        "conflict_of_interest", "funding", "acknowledgement", "references",
+        "corresponding_author_address"
+      ],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "paragraph_filter": { "attribute": "section_source", "operator": "==", "value": "heading" }
+      },
+      "condition": { "attribute": "font_size_pt", "operator": "==", "value": 9 },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_font_size",
+      "fix_params": { "font_size_pt": 9 },
+      "priority": 10,
+      "expected_repr": "font_size_pt == 9",
+      "message": "Section headings must be font size 9 pt."
+    },
+    {
+      "rule_id": "heading-no-colon",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": [
+        "introduction", "methods_and_materials", "result", "discussion", "conclusion",
+        "conflict_of_interest", "funding", "acknowledgement", "references",
+        "corresponding_author_address"
+      ],
+      "selector": {
+        "node_type": "paragraph",
+        "paragraph_filter": { "attribute": "section_source", "operator": "==", "value": "heading" }
+      },
+      "condition": { "attribute": "text", "operator": "not_matches_regex", "value": ":\\s*$" },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "strip_trailing_colon",
+      "fix_params": {},
+      "priority": 10,
+      "expected_repr": "heading text does not end with a colon",
+      "message": "Section headings must not end with a colon."
+    },
+    {
+      "rule_id": "heading-line-break-after",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": [
+        "introduction", "methods_and_materials", "result", "discussion", "conclusion",
+        "conflict_of_interest", "funding", "acknowledgement", "references",
+        "corresponding_author_address"
+      ],
+      "selector": {
+        "node_type": "paragraph",
+        "paragraph_filter": { "attribute": "section_source", "operator": "==", "value": "heading" }
+      },
+      "condition": { "attribute": "line_break_after", "operator": "==", "value": true },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "insert_line_break",
+      "fix_params": {},
+      "priority": 10,
+      "expected_repr": "line_break_after == true",
+      "message": "Section headings must be followed by a line break."
+    },
+    {
+      "rule_id": "body-text-size",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["introduction", "methods_and_materials", "result", "discussion"],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "paragraph_filter": { "attribute": "section_source", "operator": "!=", "value": "heading" }
+      },
+      "condition": { "attribute": "font_size_pt", "operator": "==", "value": 9 },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_font_size",
+      "fix_params": { "font_size_pt": 9 },
+      "priority": 10,
+      "expected_repr": "font_size_pt == 9",
+      "message": "Body text must be font size 9 pt."
+    },
+    {
+      "rule_id": "citation-superscript",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["introduction", "methods_and_materials", "result", "discussion", "conclusion"],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "filter": { "attribute": "text", "operator": "matches_regex", "value": "^\\[\\d+\\]$" }
+      },
+      "condition": { "attribute": "superscript", "operator": "==", "value": true },
+      "severity": "high",
+      "auto_fixable": true,
+      "fix_action": "set_superscript",
+      "fix_params": { "superscript": true },
+      "priority": 10,
+      "expected_repr": "superscript == true",
+      "message": "In-text citations must be superscript."
+    },
+    {
+      "rule_id": "citation-bracket-format",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["introduction", "methods_and_materials", "result", "discussion", "conclusion"],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "filter": { "attribute": "text", "operator": "matches_regex", "value": "^[\\[\\(]\\d+[\\]\\)]$" }
+      },
+      "condition": { "attribute": "text", "operator": "matches_regex", "value": "^\\[\\d+\\]$" },
+      "severity": "high",
+      "auto_fixable": true,
+      "fix_action": "set_citation_brackets",
+      "fix_params": {},
+      "priority": 11,
+      "expected_repr": "citation wrapped in square brackets, e.g. [1]",
+      "message": "In-text citations must use square brackets, e.g. [1]."
+    },
+    {
+      "rule_id": "table-caption-position",
+      "category": "structure",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "table" },
+      "condition": { "attribute": "caption_position", "operator": "==", "value": "above" },
+      "severity": "high",
+      "auto_fixable": false,
+      "priority": 10,
+      "expected_repr": "caption_position == 'above'",
+      "message": "Table captions must be positioned above the table. Flagged for manual review (locked decision: caption repositioning is not auto-fixed in v1)."
+    },
+    {
+      "rule_id": "table-caption-numbering-style",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "table" },
+      "condition": { "attribute": "numbering_style", "operator": "==", "value": "roman" },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_numbering_style",
+      "fix_params": { "numbering_style": "roman" },
+      "priority": 10,
+      "expected_repr": "numbering_style == 'roman'",
+      "message": "Tables must be numbered with Roman numerals."
+    },
+    {
+      "rule_id": "table-numbering-sequence",
+      "category": "structure",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "table" },
+      "condition": { "attribute": "caption_number", "operator": "is_non_empty" },
+      "severity": "high",
+      "auto_fixable": false,
+      "priority": 10,
+      "expected_repr": "table numbers run sequentially (I, II, III, ...) with no gaps",
+      "message": "Table numbers must run sequentially with no gaps."
+    },
+    {
+      "rule_id": "table-text-size",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "table" },
+      "condition": { "attribute": "font_size_pt", "operator": "==", "value": 8 },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_font_size",
+      "fix_params": { "font_size_pt": 8 },
+      "priority": 10,
+      "expected_repr": "font_size_pt == 8",
+      "message": "Table cell text must be font size 8 pt."
+    },
+    {
+      "rule_id": "table-cited-in-text",
+      "category": "structure",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "table" },
+      "condition": { "attribute": "referenced_in_paragraph_ids", "operator": "is_non_empty" },
+      "severity": "medium",
+      "auto_fixable": false,
+      "priority": 10,
+      "expected_repr": "table is cited in the narrative text",
+      "message": "Every table must be cited by number in the narrative text."
+    },
+    {
+      "rule_id": "figure-caption-position",
+      "category": "structure",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "figure" },
+      "condition": { "attribute": "caption_position", "operator": "==", "value": "below" },
+      "severity": "high",
+      "auto_fixable": false,
+      "priority": 10,
+      "expected_repr": "caption_position == 'below'",
+      "message": "Figure captions must be positioned below the figure. Flagged for manual review (locked decision: caption repositioning is not auto-fixed in v1)."
+    },
+    {
+      "rule_id": "figure-caption-numbering-style",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "figure" },
+      "condition": { "attribute": "numbering_style", "operator": "==", "value": "arabic" },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_numbering_style",
+      "fix_params": { "numbering_style": "arabic" },
+      "priority": 10,
+      "expected_repr": "numbering_style == 'arabic'",
+      "message": "Figures must be numbered with Arabic numerals."
+    },
+    {
+      "rule_id": "figure-numbering-sequence",
+      "category": "structure",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "figure" },
+      "condition": { "attribute": "caption_number", "operator": "is_non_empty" },
+      "severity": "high",
+      "auto_fixable": false,
+      "priority": 10,
+      "expected_repr": "figure numbers run sequentially (1, 2, 3, ...) with no gaps",
+      "message": "Figure numbers must run sequentially with no gaps."
+    },
+    {
+      "rule_id": "figure-cited-in-text",
+      "category": "structure",
+      "check_type": "deterministic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "figure" },
+      "condition": { "attribute": "referenced_in_paragraph_ids", "operator": "is_non_empty" },
+      "severity": "medium",
+      "auto_fixable": false,
+      "priority": 10,
+      "expected_repr": "figure is cited in the narrative text",
+      "message": "Every figure must be cited by number in the narrative text."
+    },
+    {
+      "rule_id": "result-text-before-figure",
+      "category": "structure",
+      "check_type": "semantic",
+      "applies_to_section": ["result"],
+      "selector": { "node_type": "section_text" },
+      "prompt_file": "prompts/result_text_before_figure.txt",
+      "prompt_vars": ["result_excerpt"],
+      "severity": "medium",
+      "priority": 200,
+      "message": "Narrative text must precede and cite each table/figure before it appears."
+    },
+    {
+      "rule_id": "reference-style-italic",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["references"],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "paragraph_filter": { "attribute": "section_source", "operator": "!=", "value": "heading" }
+      },
+      "condition": { "attribute": "italic", "operator": "==", "value": true },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_italic",
+      "fix_params": { "italic": true },
+      "priority": 10,
+      "expected_repr": "italic == true",
+      "message": "Reference entries must be italic."
+    },
+    {
+      "rule_id": "reference-style-size",
+      "category": "style",
+      "check_type": "deterministic",
+      "applies_to_section": ["references"],
+      "selector": {
+        "node_type": "run",
+        "scope": "every",
+        "paragraph_filter": { "attribute": "section_source", "operator": "!=", "value": "heading" }
+      },
+      "condition": { "attribute": "font_size_pt", "operator": "==", "value": 8 },
+      "severity": "medium",
+      "auto_fixable": true,
+      "fix_action": "set_font_size",
+      "fix_params": { "font_size_pt": 8 },
+      "priority": 10,
+      "expected_repr": "font_size_pt == 8",
+      "message": "Reference entries must be font size 8 pt."
+    },
+    {
+      "rule_id": "reference-style-vancouver-format",
+      "category": "structure",
+      "check_type": "semantic",
+      "applies_to_section": ["references"],
+      "selector": {
+        "node_type": "paragraph",
+        "paragraph_filter": { "attribute": "section_source", "operator": "!=", "value": "heading" }
+      },
+      "prompt_file": "prompts/reference_style_vancouver_format.txt",
+      "prompt_vars": ["reference_text"],
+      "severity": "medium",
+      "priority": 200,
+      "message": "References must follow the Vancouver citation format."
+    },
+    {
+      "rule_id": "corresponding-author-content",
+      "category": "structure",
+      "check_type": "semantic",
+      "applies_to_section": ["corresponding_author_address"],
+      "selector": { "node_type": "section_text" },
+      "prompt_file": "prompts/corresponding_author_content.txt",
+      "prompt_vars": ["corresponding_author_text"],
+      "severity": "medium",
+      "priority": 200,
+      "message": "Corresponding author block must include name, designation, place, mobile, email, and ORCID."
     }
   ]
 }

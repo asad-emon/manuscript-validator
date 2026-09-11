@@ -1,0 +1,9 @@
+Given this keywords line from a manuscript abstract, count the number of
+distinct keywords listed and verify the count is between 3 and 5 inclusive.
+
+Judge only what the supplied text shows. Do not infer missing keywords.
+
+Keywords line:
+"""
+{keywords_text}
+"""

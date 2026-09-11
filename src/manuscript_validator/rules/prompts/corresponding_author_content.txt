@@ -1,0 +1,11 @@
+Given this corresponding author text from a manuscript, verify it contains
+all of the following: the author's name, a professional designation, a place
+(institution, city, and country), a mobile number, an email address, and an
+ORCID identifier.
+
+Judge only what the supplied text shows. Do not infer missing fields.
+
+Corresponding author text:
+"""
+{corresponding_author_text}
+"""

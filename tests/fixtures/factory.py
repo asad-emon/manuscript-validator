@@ -423,7 +423,10 @@ MUTATIONS: dict[str, Any] = {
     "title-bold": lambda h: setattr(h.title_run.font, "bold", False),
     "title-case": lambda h: setattr(h.title_run, "text", h.title_run.text.lower()),
     "title-wordlimit": lambda h: setattr(
-        h.title_run, "text", h.title_run.text + " " + " ".join(f"word{i}" for i in range(30))
+        # Title-cased filler ("Word0", not "word0"): lowercase filler would
+        # incidentally also break `title-case` (Task 6 found this violates
+        # this fixture's own "violates exactly that rule and no other").
+        h.title_run, "text", h.title_run.text + " " + " ".join(f"Word{i}" for i in range(30))
     ),
     "author-bold": lambda h: setattr(h.author_name_run.font, "bold", False),
     "author-size": lambda h: setattr(h.author_name_run.font, "size", Pt(12)),

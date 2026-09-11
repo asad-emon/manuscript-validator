@@ -80,6 +80,18 @@ def paragraph_text(p_el: Any) -> str:
     return "".join(run_text(r_el) for r_el in p_el.xpath(".//w:r[not(ancestor::w:rPr)]"))
 
 
+def has_trailing_line_break(p_el: Any) -> bool:
+    """True if the paragraph's last content run carries a `<w:br/>` -- the
+    journal template's convention for a manual break after a heading, built
+    via `paragraph.add_run().add_break()`. Checked on the *last* run only:
+    a `w:br` earlier in the paragraph is a mid-paragraph line wrap, not a
+    trailing one."""
+    run_elements = p_el.xpath(".//w:r[not(ancestor::w:rPr)]")
+    if not run_elements:
+        return False
+    return run_elements[-1].find(qn("w:br")) is not None
+
+
 def is_uppercase_literal(text: str) -> bool:
     """True if `text` is actually typed in caps, not rendered so via a style
     transform. Distinct from `w:caps` (`all_caps_property`): the journal rule
@@ -217,6 +229,7 @@ class EffectiveFormattingResolver:
 __all__ = [
     "EffectiveFormattingResolver",
     "Resolved",
+    "has_trailing_line_break",
     "is_uppercase_literal",
     "paragraph_text",
     "run_text",

@@ -21,6 +21,7 @@ from manuscript_validator.models.ast import Ast, Figure, Paragraph, Run, Table
 from manuscript_validator.parser import captions, shapes
 from manuscript_validator.parser.effective import (
     EffectiveFormattingResolver,
+    has_trailing_line_break,
     is_uppercase_literal,
     paragraph_text,
 )
@@ -84,6 +85,7 @@ def _build_paragraph(
         alignment=_alignment_str(docx_paragraph.alignment),
         in_table=item.in_table,
         cell=item.cell,
+        line_break_after=has_trailing_line_break(item.element),
     )
     for _run_id, run_el in iter_indexed_runs(item.id, item.element):
         paragraph.runs.append(_build_run(run_el, docx_paragraph, resolver))

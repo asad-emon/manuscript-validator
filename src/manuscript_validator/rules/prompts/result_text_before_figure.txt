@@ -1,0 +1,10 @@
+Given this excerpt from the Result section, verify that narrative text
+precedes the table or figure shown below and explicitly cites it by number
+before the reader reaches it.
+
+Judge only what the supplied text shows. Do not infer missing narrative.
+
+Result excerpt (narrative text, then the table/figure reference):
+"""
+{result_excerpt}
+"""
