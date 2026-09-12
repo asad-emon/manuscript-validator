@@ -107,7 +107,12 @@ def plan_fixes(violations: list[Violation], ruleset: Ruleset) -> FixPlan:
     return FixPlan(ops=accepted)
 
 
-def _resolve_target(index: ElementIndex, op: FixOp) -> Any:
+def resolve_target(index: ElementIndex, op: FixOp) -> Any:
+    """The live element `op.target_id` names -- a run if the op came from a
+    run-level violation, a paragraph otherwise. Shared with
+    `output.tracked_changes`, which replays the same `FixPlan` a second time
+    against a different clone.
+    """
     if op.run_index is not None:
         return index.run(op.target_id)
     return index.paragraph(op.target_id)
@@ -133,7 +138,7 @@ def apply_fix_plan(
         violation = violations_by_key.get((op.rule_id, op.paragraph_id))
         try:
             handler = _ACTIONS[op.action]
-            element = _resolve_target(element_index, op)
+            element = resolve_target(element_index, op)
             before, after = handler(element, op.params)
         except (FixApplicationError, DocumentError, KeyError) as exc:
             if violation is not None:
@@ -156,4 +161,4 @@ def apply_fix_plan(
     return audit_log
 
 
-__all__ = ["apply_fix_plan", "plan_fixes"]
+__all__ = ["apply_fix_plan", "plan_fixes", "resolve_target"]

@@ -56,12 +56,27 @@ def _wrap(run_el: Any) -> Run:
     return Run(run_el, cast(Any, None))
 
 
-def _last_visible_run(paragraph_el: Any) -> Any | None:
+def last_visible_run(paragraph_el: Any) -> Any | None:
     """The last run in `paragraph_el` that carries visible text -- skips a
-    trailing `add_run().add_break()` run, whose own `.text` is `"\\n"`."""
+    trailing `add_run().add_break()` run, whose own `.text` is `"\\n"`.
+
+    Exported (not `_`-prefixed): `output.tracked_changes` needs to locate the
+    exact same run this module edits, to wrap it in `w:del`/`w:ins` instead of
+    editing it directly -- two callers, one source of truth for "which run".
+    """
     run_elements = paragraph_el.xpath(".//w:r[not(ancestor::w:rPr)]")
     for run_el in reversed(run_elements):
         if _wrap(run_el).text.strip():
+            return run_el
+    return None
+
+
+def find_caption_run(paragraph_el: Any) -> Any | None:
+    """The first run in `paragraph_el` whose text is a caption number token
+    (`"Table 1."`, `"Figure IV:"`, ...) -- exported for the same reason as
+    `last_visible_run`."""
+    for run_el in paragraph_el.xpath(".//w:r[not(ancestor::w:rPr)]"):
+        if _CAPTION_TOKEN_RE.match(_wrap(run_el).text) is not None:
             return run_el
     return None
 
@@ -125,7 +140,7 @@ def set_uppercase_literal(run_el: Any, _params: dict[str, Any]) -> ActionResult:
 
 
 def strip_trailing_colon(paragraph_el: Any, _params: dict[str, Any]) -> ActionResult:
-    run_el = _last_visible_run(paragraph_el)
+    run_el = last_visible_run(paragraph_el)
     if run_el is None:
         raise FixApplicationError("strip_trailing_colon: paragraph has no visible run")
     run = _wrap(run_el)
@@ -159,21 +174,21 @@ def set_numbering_style(paragraph_el: Any, params: dict[str, Any]) -> ActionResu
     `table-numbering-sequence`'s job, and it is not auto-fixable: closing a
     numbering gap can renumber every table after it)."""
     target_style = params["numbering_style"]
-    for run_el in paragraph_el.xpath(".//w:r[not(ancestor::w:rPr)]"):
-        run = _wrap(run_el)
-        match = _CAPTION_TOKEN_RE.match(run.text)
-        if match is None:
-            continue
-        prefix, token, suffix = match.groups()
-        value = int(token) if token.isdigit() else roman_to_int(token)
-        if value is None:
-            continue
-        new_token = int_to_roman(value) if target_style == "roman" else str(value)
-        before = run.text
-        after = f"{prefix}{new_token}{suffix}"
-        run.text = after
-        return {"text": before}, {"text": after}
-    raise FixApplicationError("set_numbering_style: no caption-numbered run found")
+    run_el = find_caption_run(paragraph_el)
+    if run_el is None:
+        raise FixApplicationError("set_numbering_style: no caption-numbered run found")
+    run = _wrap(run_el)
+    match = _CAPTION_TOKEN_RE.match(run.text)
+    assert match is not None  # find_caption_run only returns a matching run
+    prefix, token, suffix = match.groups()
+    value = int(token) if token.isdigit() else roman_to_int(token)
+    if value is None:
+        raise FixApplicationError(f"set_numbering_style: {token!r} is not a valid numeral")
+    new_token = int_to_roman(value) if target_style == "roman" else str(value)
+    before = run.text
+    after = f"{prefix}{new_token}{suffix}"
+    run.text = after
+    return {"text": before}, {"text": after}
 
 
 #: Whether an action's `target_id` names a run or a paragraph -- resolved by
@@ -200,7 +215,9 @@ __all__ = [
     "PARAGRAPH_ACTIONS",
     "RUN_ACTIONS",
     "ActionResult",
+    "find_caption_run",
     "insert_line_break",
+    "last_visible_run",
     "set_bold",
     "set_citation_brackets",
     "set_font",
