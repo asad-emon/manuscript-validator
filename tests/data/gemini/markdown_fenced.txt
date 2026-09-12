@@ -1,0 +1,9 @@
+```json
+{
+  "violation": false,
+  "explanation": "The abstract lists four keywords, within the 3-5 range.",
+  "location_hint": "Keywords line",
+  "suggested_fix": "",
+  "confidence": 0.95
+}
+```

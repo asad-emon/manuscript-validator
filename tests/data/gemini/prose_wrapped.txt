@@ -1,0 +1,11 @@
+Sure, here is the verdict you requested:
+
+{
+  "violation": true,
+  "explanation": "Only two keywords are listed.",
+  "location_hint": "Keywords line",
+  "suggested_fix": "Add more keywords.",
+  "confidence": 0.8
+}
+
+Let me know if you need anything else!

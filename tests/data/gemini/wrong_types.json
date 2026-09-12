@@ -1,0 +1,7 @@
+{
+  "violation": "yes",
+  "explanation": "The abstract lists only two keywords.",
+  "location_hint": "Keywords line",
+  "suggested_fix": "Add more keywords.",
+  "confidence": "high"
+}
