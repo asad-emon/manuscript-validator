@@ -425,7 +425,10 @@
       "rule_id": "body-text-size",
       "category": "style",
       "check_type": "deterministic",
-      "applies_to_section": ["introduction", "methods_and_materials", "result", "discussion"],
+      "applies_to_section": [
+        "introduction", "methods_and_materials", "result", "discussion",
+        "conclusion", "conflict_of_interest", "funding", "acknowledgement"
+      ],
       "selector": {
         "node_type": "run",
         "scope": "every",

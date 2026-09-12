@@ -137,11 +137,11 @@ is most expensive. Using `importlib.resources` from the start costs nothing.
 | `title-caps` marked `auto_fixable: yes` | **Flag only** in v1 | Automatic title-casing mangles acronyms and Latin binomials (COVID, mRNA, p53, *S. aureus*). Destroying an author's terminology is the kind of error that ends trust in the whole tool. **User decision, 2026-09-11** |
 | Section 5.1 gives tables metadata only | Cell paragraphs emitted into the flat paragraph list, tagged `in_table`/`cell` | `table-text-size` (cell font 8) has nothing to check otherwise, and every run-level rule then works uniformly inside tables |
 | `author-bold-superscript` bundles three checks | Split into `author-bold`, `author-size`, `author-affiliation-superscript` | One rule, one condition, one fix action. A bundled rule has no answer to "which fix?" when only one condition fails |
-| Section 6's 25 rows | ~38 config entries | The splits above, plus `table-cited-in-text` / `figure-cited-in-text` (the cross-reference half of `result-text-before-figure` is deterministic and free) and `*-numbering-sequence` (numbers must start at 1/I with no gaps -- a common real violation, ~15 lines) |
+| Section 6's 25 rows | 40 config entries (Task 6, verified against the fixture factory's own inventory in both directions by `test_rules_coverage.py`) | The splits above, plus `table-cited-in-text` / `figure-cited-in-text` (the cross-reference half of `result-text-before-figure` is deterministic and free) and `*-numbering-sequence` (numbers must start at 1/I with no gaps -- a common real violation, ~15 lines) |
 | FR-11 "zero deterministic violations" | Zero remaining **auto-fixable** deterministic violations | Flag-only rules such as the word limits survive autofix by design; the literal reading is unsatisfiable |
 | Section 7.2 caches per document version | Cache per normalised section **text** | Formatting fixes do not change text, so FR-7's post-fix re-validation becomes a complete cache hit and costs no extra API calls. A version key would miss that entirely |
 | Section 10 "PyQt or PySide" | **PySide6** | LGPL, so no commercial-licence question for a distributed `Setup.exe`; official binding; good PyInstaller support; runs offscreen on the Linux dev box |
-| Section 6 `body-text-size` lists four sections | Extend to conclusion, conflict of interest, funding, acknowledgement | All body prose at the same size. The list lives in the rule's `applies_to_section`, so it is a one-line config change either way |
+| Section 6 `body-text-size` lists four sections | Extend to conclusion, conflict of interest, funding, acknowledgement | All body prose at the same size. The list lives in the rule's `applies_to_section`, so it is a one-line config change either way. **Note:** Task 6 shipped with the literal four-section list; this row's own decision wasn't actually applied to `journal_v1.json` until the Task 16 hardening pass caught the gap by re-reading this file against the shipped config -- confirmed it catches a real violation (`conclusion` section, wrong body size) on one of the five real manuscripts that the narrower scope missed entirely |
 | — | **Body only in v1**; headers, footers, footnotes, endnotes, and textboxes unchecked | They are separate OOXML parts. Stated in the report rather than silently skipped -- discovering the omission via a reviewer's markup later is a credibility problem |
 
 ## Confirmed spec assumptions (section 14)
@@ -150,9 +150,23 @@ All three hold as written: heading detection by case-insensitive text match
 (through the synonym table); Vancouver validation covers formatting and ordering
 conventions, not whether cited works exist; word counts are whitespace-delimited.
 
+## Resolved questions
+
+- **Gemini model tier.** Resolved (Task 12): `gemini-2.5-flash` is the
+  `llm_client.DEFAULT_MODEL` default -- fast and cheap enough for a
+  single-boolean-plus-explanation structured verdict, not open-ended
+  generation. Not exposed as a user setting in v1; revisit if a specific rule
+  needs a stronger model.
+
 ## Open questions
 
-- **Gemini model tier.** Plan assumes a flash-tier default, settable in app
-  settings. Awaiting confirmation.
-- **Real-Word redline verification.** No Linux gate substitutes for opening the
-  redline in Word; deferred to Task 15 and tracked as a risk until then.
+- **Real-Word redline verification.** No Linux gate substitutes for opening
+  the redline in Word; deferred to Task 15 (blocked on Windows access) and
+  tracked as a risk until then. Task 10's XSD-schema validation and LibreOffice
+  round-trip are the closest available substitutes and both pass, but neither
+  proves Word specifically renders a formatting change as "Formatted: Font:
+  14 pt, Bold" rather than something else.
+- **PyInstaller Windows build, Inno Setup installer, real DPAPI round trip.**
+  All of Task 15's code is written and tested against a fake `win32crypt`
+  module (see Task 15 in the development checklist); the actual Windows build
+  and packaging steps are blocked on Windows VM access.

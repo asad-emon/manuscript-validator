@@ -15,6 +15,7 @@ from pathlib import Path
 
 from manuscript_validator import __version__
 from manuscript_validator.errors import ManuscriptValidatorError
+from manuscript_validator.logging_setup import configure_logging, get_redacting_filter
 from manuscript_validator.pipeline import PipelineOptions, PipelineResult, run
 
 #: Environment variable the CLI reads the Gemini API key from -- the UI
@@ -101,6 +102,11 @@ def _run_validate(args: argparse.Namespace) -> int:
         return EXIT_ERROR
 
     api_key = None if args.no_semantic else os.environ.get(API_KEY_ENV_VAR)
+    if api_key:
+        # Registered before anything else touches it: a third-party library
+        # (httpx, google-genai) logging a request URL at DEBUG level must
+        # not be able to leak it even though this CLI never logs it itself.
+        get_redacting_filter().register_secret(api_key)
     options = PipelineOptions(
         output_dir=args.output_dir,
         run_semantic=not args.no_semantic,
@@ -120,6 +126,7 @@ def _run_validate(args: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    configure_logging()
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command is None:

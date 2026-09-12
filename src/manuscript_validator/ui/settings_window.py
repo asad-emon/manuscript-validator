@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from manuscript_validator.config import get_api_key, set_api_key
+from manuscript_validator.logging_setup import get_redacting_filter
 from manuscript_validator.rules.llm_client import GeminiSemanticClient
 
 
@@ -38,6 +39,7 @@ class SettingsDialog(QDialog):
         existing_key = get_api_key()
         if existing_key:
             self._key_edit.setText(existing_key)
+            get_redacting_filter().register_secret(existing_key)
 
         self._show_checkbox = QCheckBox("Show")
         self._show_checkbox.toggled.connect(self._on_show_toggled)
@@ -96,6 +98,7 @@ class SettingsDialog(QDialog):
     def _on_save(self) -> None:
         key = self._key_edit.text().strip()
         if key:
+            get_redacting_filter().register_secret(key)
             set_api_key(key)
         self.accept()
 

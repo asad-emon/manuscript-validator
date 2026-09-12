@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from docx.document import Document as DocumentObject
+from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml.ns import qn
 from docx.text.font import Font
 from docx.text.paragraph import Paragraph
@@ -124,6 +125,35 @@ class EffectiveFormattingResolver:
     def __init__(self, document: DocumentObject) -> None:
         self._doc_defaults_holder = _StaticRPrHolder(self._find_doc_defaults_rpr(document))
         self._theme_fonts = self._load_theme_fonts(document)
+        self._styles = document.styles
+        # `Styles.get_by_id` (used for both an explicit style id and the
+        # None-means-default case) does an O(styles-in-document) linear scan
+        # every call -- python-docx caches nothing here. A real manuscript's
+        # paragraphs overwhelmingly share a small handful of distinct style
+        # ids, so caching by (style_id, style_type) turns thousands of runs
+        # into, in practice, a handful of cache misses. Confirmed via
+        # profiling a synthetic 60-page document: this was the single
+        # dominant cost of `build_ast`, at roughly 8x the total runtime of
+        # everything else combined.
+        self._style_object_cache: dict[tuple[str | None, WD_STYLE_TYPE], Any] = {}
+        self._style_chain_cache: dict[tuple[str | None, WD_STYLE_TYPE], tuple[Any, ...]] = {}
+
+    def _cached_style(self, style_id: str | None, style_type: WD_STYLE_TYPE) -> Any | None:
+        key = (style_id, style_type)
+        if key not in self._style_object_cache:
+            self._style_object_cache[key] = self._styles.get_by_id(style_id, style_type)
+        return self._style_object_cache[key]
+
+    def _cached_style_chain(
+        self, style_id: str | None, style_type: WD_STYLE_TYPE
+    ) -> tuple[Any, ...]:
+        key = (style_id, style_type)
+        if key not in self._style_chain_cache:
+            style = self._cached_style(style_id, style_type)
+            self._style_chain_cache[key] = (
+                tuple(_style_chain(style.element)) if style is not None else ()
+            )
+        return self._style_chain_cache[key]
 
     @staticmethod
     def _find_doc_defaults_rpr(document: DocumentObject) -> Any | None:
@@ -156,15 +186,16 @@ class EffectiveFormattingResolver:
         return {}
 
     def _chain_for(self, run: Run, paragraph: Paragraph) -> list[tuple[Any, FormattingSource]]:
+        """Built from `run._r.style`/`paragraph._p.style` (cheap XML-attribute
+        reads) plus the cached style lookup/chain above, never the high-level
+        `run.style`/`paragraph.style` properties -- those are what triggered
+        the uncached linear scan this method exists to avoid.
+        """
         chain: list[tuple[Any, FormattingSource]] = [(run._r, FormattingSource.RUN)]
-        character_style = run.style
-        if character_style is not None:
-            for style_elm in _style_chain(character_style.element):
-                chain.append((style_elm, FormattingSource.CHARACTER_STYLE))
-        paragraph_style = paragraph.style
-        if paragraph_style is not None:
-            for style_elm in _style_chain(paragraph_style.element):
-                chain.append((style_elm, FormattingSource.PARAGRAPH_STYLE))
+        character_chain = self._cached_style_chain(run._r.style, WD_STYLE_TYPE.CHARACTER)
+        chain.extend((style_elm, FormattingSource.CHARACTER_STYLE) for style_elm in character_chain)
+        paragraph_chain = self._cached_style_chain(paragraph._p.style, WD_STYLE_TYPE.PARAGRAPH)
+        chain.extend((style_elm, FormattingSource.PARAGRAPH_STYLE) for style_elm in paragraph_chain)
         chain.append((self._doc_defaults_holder, FormattingSource.DOC_DEFAULT))
         return chain
 
