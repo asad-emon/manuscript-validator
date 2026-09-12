@@ -227,7 +227,16 @@ def _evaluate_document_rule(
     missing_names = {s.value for s in segmentation.missing_sections}
     if section_name not in missing_names:
         return []
-    return [_build_violation(rule, found=f"section '{section_name}' not found")]
+    # A missing section has no paragraph of its own to anchor a report
+    # comment to (Task 11) -- the document's first paragraph is the nearest
+    # honest stand-in, so the report doesn't silently drop this violation
+    # from the annotated .docx.
+    anchor = ast.paragraphs[0].id if ast.paragraphs else None
+    return [
+        _build_violation(
+            rule, anchor_paragraph_id=anchor, found=f"section '{section_name}' not found"
+        )
+    ]
 
 
 def _check_numbering_sequence(
