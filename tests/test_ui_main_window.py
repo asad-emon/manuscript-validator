@@ -72,6 +72,38 @@ def test_running_the_pipeline_populates_report_view_and_override_panel(
 
     assert window._report_view.rowCount() > 0
     assert window._override_panel._table.rowCount() > 0
+    assert "violation(s)" in window.statusBar().currentMessage()
+
+
+def test_opening_a_file_derives_output_dir_from_its_stem_with_no_directory_prompt(
+    qtbot, _has_stored_key: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from PySide6.QtWidgets import QFileDialog
+
+    doc, _handles = violating("title-size")
+    source = tmp_path / "paper.docx"
+    doc.save(source)
+
+    monkeypatch.setattr(
+        QFileDialog, "getOpenFileName", staticmethod(lambda *a, **k: (str(source), ""))
+    )
+    directory_prompted = []
+    monkeypatch.setattr(
+        QFileDialog,
+        "getExistingDirectory",
+        staticmethod(lambda *a, **k: directory_prompted.append(True) or ""),
+    )
+
+    window = MainWindow()
+    qtbot.addWidget(window)
+
+    window._on_open()
+
+    assert directory_prompted == []
+    assert window._output_dir == tmp_path / "paper"
+    assert window._output_dir.is_dir()
+
+    qtbot.waitUntil(lambda: window._open_button.isEnabled(), timeout=15_000)
 
 
 def test_failed_run_shows_an_error_and_re_enables_file_operations(

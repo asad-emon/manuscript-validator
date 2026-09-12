@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -57,12 +58,18 @@ class MainWindow(QMainWindow):
         splitter = QSplitter()
         splitter.addWidget(self._report_view)
         splitter.addWidget(self._override_panel)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 1)
+        # QSplitter defaults to a Preferred vertical size policy, so without
+        # this it hugs its sizeHint and leaves the tables stranded near the
+        # top of a resized/maximized window instead of filling it.
+        splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         layout = QVBoxLayout()
         layout.addWidget(self._open_button)
         layout.addWidget(self._status_label)
         layout.addWidget(self._progress_bar)
-        layout.addWidget(splitter)
+        layout.addWidget(splitter, 1)
 
         central = QWidget()
         central.setLayout(layout)
@@ -101,12 +108,10 @@ class MainWindow(QMainWindow):
         )
         if not path_str:
             return
-        output_dir_str = QFileDialog.getExistingDirectory(self, "Choose output folder")
-        if not output_dir_str:
-            return
 
         self._source = Path(path_str)
-        self._output_dir = Path(output_dir_str)
+        self._output_dir = self._source.parent / self._source.stem
+        self._output_dir.mkdir(parents=True, exist_ok=True)
         self._run_pipeline(section_overrides=None)
 
     def _on_overrides_applied(self, overrides: dict[str, str]) -> None:
@@ -138,7 +143,8 @@ class MainWindow(QMainWindow):
 
     def _on_finished(self, result: PipelineResult) -> None:
         self._set_file_operations_enabled(True)
-        self._status_label.setText(
+        self._status_label.setText("Ready.")
+        self.statusBar().showMessage(
             f"{result.violation_count} violation(s): {result.fixed_count} fixed, "
             f"{result.needs_review_count} need review"
         )
@@ -149,7 +155,8 @@ class MainWindow(QMainWindow):
 
     def _on_failed(self, message: str) -> None:
         self._set_file_operations_enabled(True)
-        self._status_label.setText("Failed.")
+        self._status_label.setText("Ready.")
+        self.statusBar().showMessage("Validation failed.")
         QMessageBox.critical(self, "Validation failed", message)
 
 
