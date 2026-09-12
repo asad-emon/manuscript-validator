@@ -22,4 +22,4 @@ tools/_out/
 
 # Real, user-supplied manuscripts (Task 3) -- author names, affiliations, and
 # emails inside these are real, so they stay local-only, never committed.
-tests/fixtures/real/*.docx
+tests/fixtures/real/
