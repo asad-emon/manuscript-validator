@@ -58,17 +58,19 @@ if (-not (Test-Path $exePath)) {
 Write-Host "== Build output: $exePath =="
 
 Write-Host "== Looking for Inno Setup's compiler (ISCC.exe) =="
-$iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
-if (-not $iscc) {
+$isccCommand = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+if ($isccCommand) {
+    $isccPath = $isccCommand.Path
+} else {
     $default = "${Env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
     if (Test-Path $default) {
-        $iscc = Get-Item $default
+        $isccPath = $default
     }
 }
 
-if ($iscc) {
+if ($isccPath) {
     Write-Host "== Building installer with Inno Setup =="
-    & $iscc.Path (Join-Path $RepoRoot "packaging\installer.iss")
+    & $isccPath (Join-Path $RepoRoot "packaging\installer.iss")
     Write-Host "== Installer output: dist\installer\ =="
 } else {
     Write-Host ""
