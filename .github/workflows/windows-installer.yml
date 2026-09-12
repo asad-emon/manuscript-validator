@@ -1,0 +1,84 @@
+name: Windows installer
+
+# Builds the frozen desktop app (PyInstaller) and the Setup.exe installer
+# (Inno Setup) on a real windows-latest runner -- the one part of Task 15
+# that can't be verified on the Linux dev box. See DEVELOPMENT_CHECKLIST.md
+# and packaging/{build.spec,build.ps1,installer.iss}, which this workflow
+# mirrors rather than duplicates.
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
+
+      - name: Install manuscript-validator (gui + windows extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c constraints.txt ".[gui,windows,dev]"
+
+      - name: Run the offline test suite
+        run: pytest -q
+
+      - name: Build the frozen app with PyInstaller
+        run: pyinstaller packaging/build.spec --noconfirm --clean
+
+      - name: Ensure Inno Setup is available
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y
+          }
+
+      - name: Compile the installer with Inno Setup
+        shell: cmd
+        run: ISCC.exe packaging\installer.iss
+
+      - name: Upload the onedir build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ManuscriptValidator-onedir
+          path: dist/ManuscriptValidator/
+          if-no-files-found: error
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ManuscriptValidatorSetup
+          path: dist/installer/*.exe
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ManuscriptValidatorSetup
+          path: installer
+
+      - name: Attach the installer to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/*.exe
