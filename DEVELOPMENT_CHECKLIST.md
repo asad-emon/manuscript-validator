@@ -211,29 +211,32 @@ Tracked separately because each is a silent-wrongness bug, not a missing feature
 - **Done when:** end-to-end acceptance test passes over all real manuscripts ✅ (parametrized over all five, each asserting: zero crash, all five outputs written and non-empty, source-file SHA-256 unchanged) · exit-code-per-severity tested against real rule severities from `journal_v1.json` (`table-caption-position`: high/not-auto-fixable; `title-wordlimit`: medium/not-auto-fixable), not synthetic ones
 - **Verified 2026-09-12:** 579 tests pass (30 new), 1 deselected (`live`) · ruff and mypy --strict clean · both `python -m manuscript_validator.cli` and the installed `manuscript-validator` console script verified to run identically end to end
 
-### 14. `[ ]` PySide6 UI *(M12, ~4 d)*
-`ui/{main_window,settings_window,report_view,workers}.py`, `app.py`. Developed with `QT_QPA_PLATFORM=offscreen`.
-- `[ ]` Pipeline in a `QRunnable` on a `QThreadPool`; C4's `progress` callable marshals via signals
-- `[ ]` Settings screen talks to the settings-store **protocol**, so it works against the dev backend on Linux and DPAPI on Windows with no code change
-- `[ ]` First launch with no key opens Settings modally before file operations are enabled (§4.1)
-- `[ ]` **Section-override panel** — detected sections with a per-block dropdown. ~60 lines of Qt that eliminates segmentation's worst failure mode; store overrides in the report so re-runs are reproducible
-- `[ ]` `test_no_qt_imports.py` mechanically asserts no pipeline module transitively imports PySide6. §13's Qt-freedom mandate is the single constraint making Linux development viable — enforce it, don't hope for it
+### 14. `[x]` PySide6 UI *(M12, ~4 d)*
+`ui/{main_window,settings_window,report_view,workers}.py`, `app.py`. Developed and tested with `QT_QPA_PLATFORM=offscreen` (now set automatically in `tests/conftest.py` via `setdefault`, so the whole suite runs without a developer needing to remember the env var — real displays are unaffected since `setdefault` never overrides an already-set value). `pytest-qt` added as a dev dependency for the `qtbot` fixture.
+- `[x]` Pipeline in a `QRunnable` (`ui.workers.PipelineWorker`) on a `QThreadPool`; C4's `progress` callable marshals onto `WorkerSignals.progress` (a `QObject` companion, since a bare `QRunnable` can't itself define signals). An uncaught exception on the worker thread is caught and turned into a `failed` signal rather than being silently dropped by Qt
+- `[x]` Settings screen (`SettingsDialog`) talks only to `config.settings_store`'s module-level `get_api_key()`/`set_api_key()` — never a `SecretBox` directly — so it works unchanged against the dev backend on Linux and DPAPI on Windows. Masked by default (`QLineEdit.EchoMode.Password`) with a "Show" checkbox; "Test connection" calls the real `GeminiSemanticClient.test_connection()` (zero token spend, real auth check)
+- `[x]` First launch with no key opens Settings modally before file operations are enabled (§4.1) — `MainWindow.showEvent` checks `get_api_key()` and, if `None`, disables the Open button before `SettingsDialog.exec()` and re-enables it after, regardless of whether the user actually saved a key
+- `[x]` **Section-override panel** (`SectionOverridePanel`) — one row per paragraph with a dropdown for its detected section; `overrides_applied` emits only the rows a human actually changed (not every row's current value, changed or not — a subtlety the tests specifically cover), feeding `PipelineOptions.section_overrides` on the next run. Overrides are applied in `pipeline.py` after segmentation and before validation, so every rule sees the corrected label, not just the report — and `ValidationReport.section_overrides` (a new field, emitted only when non-empty, so the Task 2 golden-file tests are untouched) records them for a reproducible re-run
+- `[x]` `test_no_qt_imports.py` mechanically asserts no pipeline module transitively imports PySide6 — already built in Task 1, unchanged; this task is what first gives it something real to check against besides stubs
+- **Done when:** every widget testable headlessly ✅ (`qtbot`, no real display) · first-launch settings gate, save/cancel persistence, and "Test connection" (mocked, no real network call in the default test run) all covered · a full pipeline run from `MainWindow` populates both the report view and the override panel · the actual `app.py` bootstrap constructs a window and exits cleanly under `QT_QPA_PLATFORM=offscreen`
+- **Verified 2026-09-12:** 621 tests pass (42 new across workers/report-view/settings/main-window), 1 deselected (`live`) · ruff and mypy --strict clean (PySide6 ships its own type stubs) · also landed the Linux-testable portion of Task 15's `config/settings_store.py` (below), since Task 14's settings screen needed a working store to talk to
 
 ---
 
 ## Phase 7 — Windows packaging & release
 
-### 15. `[ ]` Windows-only: DPAPI, PyInstaller, Inno Setup *(M13, ~3 d — requires the Windows VM)*
-Three files, because the `SecretBox` seam keeps DPAPI to ~60 lines.
-- `[ ]` `config/settings_store.py`: `SecretBox` Protocol + platform factory. **Lazy `import win32crypt` inside the method**, never at module top level — that's the whole trick that keeps the module importable and testable on Linux
-- `[ ]` `DpapiSecretBox` with app-specific entropy and `flags=0` (per-user; never `CRYPTPROTECT_LOCAL_MACHINE`); `FernetSecretBox` for dev, env-guarded; `NullSecretBox` for tests, refusing to construct when frozen
-- `[ ]` Scheme-tagged config file (`{"scheme": "dpapi", "ciphertext": "…"}`) so a config written on the dev box is *detected and rejected* on Windows rather than producing a garbage decrypt surfacing as a mysterious "key rejected" from Gemini
-- `[ ]` Atomic write via `os.replace()`; `get_api_key()` returns `None` and **never raises** for missing file, absent key, decrypt failure, scheme mismatch, or JSON parse error
-- `[ ]` Linux-runnable DPAPI test injecting a fake `sys.modules["win32crypt"]` and asserting call shape — catches the most likely bugs without Windows
-- `[ ]` `pyinstaller --name ManuscriptValidator --windowed --onedir main.py` with `--hidden-import win32crypt --hidden-import win32timezone`; `journal_v1.json` and `prompts/*.txt` must load (the `datas` entry is the usual failure)
-- `[ ]` Inno Setup `Setup.exe`: Program Files install, Start Menu shortcut, uninstall entry
-- `[ ]` `dist/` runs on a clean VM with no Python
-- `[ ]` **Open `<stem>.tracked.docx` in real Word** and confirm formatting changes show as "Formatted: Font: 14 pt, Bold" rather than as retyped text — the deferred Task 10 check, and the one gate no Linux tooling can substitute for
+### 15. `[~]` Windows-only: DPAPI, PyInstaller, Inno Setup *(M13, ~3 d — requires the Windows VM)*
+Three files, because the `SecretBox` seam keeps DPAPI to ~60 lines. Split cleanly by what a Windows VM is actually needed for: everything about the `SecretBox` abstraction, the file format, and the DPAPI *call shape* is written and tested on Linux (below); the real DPAPI round trip, the PyInstaller Windows build, Inno Setup, and real-Word verification remain open, blocked on Windows access.
+- `[x]` `config/settings_store.py`: `SecretBox` Protocol + platform factory (`default_secret_box()`: DPAPI on Windows always, the dev backend elsewhere only behind an env var, otherwise a loud `UnsupportedPlatformError` rather than a silent downgrade). **Lazy `import win32crypt` inside the method**, never at module top level — confirmed this is what keeps `settings_store_dpapi.py` importable (and its call shape testable) on Linux with no `pywin32` installed
+- `[x]` `DpapiSecretBox` with app-specific entropy (`b"manuscript-validator-v1"`) and `flags=0` (per-user; never `CRYPTPROTECT_LOCAL_MACHINE`) — both asserted against a fake `win32crypt`, not just implemented and hoped correct; `FernetSecretBox` for dev, env-guarded (`MANUSCRIPT_VALIDATOR_DEV_SECRET_STORE=1`, checked only off Windows); `NullSecretBox` for tests, refusing to construct when `sys.frozen` is set
+- `[x]` Scheme-tagged config file (`{"scheme": "dpapi", "api_key": "…"}`) so a config written on the dev box is *detected and rejected* elsewhere rather than producing a garbage decrypt surfacing as a mysterious "key rejected" from Gemini
+- `[x]` Atomic write via `os.replace()` (through a same-directory `.tmp` file, so the replace stays on one filesystem); `get_api_key()` returns `None` and **never raises** for missing file, absent key, decrypt failure, scheme mismatch, or JSON parse error — each mode has its own test
+- `[x]` Linux-runnable DPAPI test injecting a fake `sys.modules["win32crypt"]` and asserting call shape (entropy, `flags=0`, a full encrypt/decrypt round trip, a decrypt failure raising `SettingsError`) — catches the most likely bugs without Windows
+- `[ ]` `pyinstaller --name ManuscriptValidator --windowed --onedir main.py` with `--hidden-import win32crypt --hidden-import win32timezone`; `journal_v1.json` and `prompts/*.txt` must load (the `datas` entry is the usual failure) — **blocked, no Windows VM in this environment**
+- `[ ]` Inno Setup `Setup.exe`: Program Files install, Start Menu shortcut, uninstall entry — **blocked, no Windows VM**
+- `[ ]` `dist/` runs on a clean VM with no Python — **blocked, no Windows VM**
+- `[ ]` **Open `<stem>.tracked.docx` in real Word** and confirm formatting changes show as "Formatted: Font: 14 pt, Bold" rather than as retyped text — the deferred Task 10 check, and the one gate no Linux tooling can substitute for. **Blocked, no Windows/Word in this environment** — Task 10's own XSD/LibreOffice verification is the closest available substitute and already passed
+- **Verified 2026-09-12 (Linux-testable scope only):** 23 new tests in `test_settings_store.py`; ruff and mypy --strict clean. The real DPAPI round trip, PyInstaller Windows build, and Word verification remain open risks tracked here, not silently dropped
 
 ### 16. `[ ]` Hardening & release *(M14, ~2 d)*
 - `[ ]` 60-page manuscript under 5 s for the deterministic pass
@@ -245,17 +248,20 @@ Three files, because the `SecretBox` seam keeps DPAPI to ~60 lines.
 
 ## Progress Summary
 
+_(Table last reconciled with task checkboxes 2026-09-12 — see individual task entries above for the authoritative status; this is a summary view, not a second source of truth.)_
+
 | Phase | Tasks | Done | Partial | Remaining |
 |---|---|---|---|---|
-| 0 — Partial implementation tracking | 0 | 0 | 0 | 0 |
-| 1 — Foundation | 3 | 2 | 1 | 0 |
-| 2 — Document understanding | 2 | 0 | 1 | 1 |
-| 3 — Validation | 2 | 0 | 0 | 2 |
-| 4 — Correction & output | 4 | 0 | 0 | 4 |
-| 5 — Semantic layer | 1 | 0 | 0 | 1 |
-| 6 — Delivery surfaces | 2 | 0 | 0 | 2 |
-| 7 — Windows packaging & release | 2 | 0 | 0 | 2 |
-| **Total** | **16** | **2** | **2** | **12** |
+| 1 — Foundation | 3 | 3 | 0 | 0 |
+| 2 — Document understanding | 2 | 2 | 0 | 0 |
+| 3 — Validation | 2 | 1 | 1 | 0 |
+| 4 — Correction & output | 4 | 4 | 0 | 0 |
+| 5 — Semantic layer | 1 | 1 | 0 | 0 |
+| 6 — Delivery surfaces | 2 | 2 | 0 | 0 |
+| 7 — Windows packaging & release | 2 | 0 | 1 | 1 |
+| **Total** | **16** | **13** | **2** | **1** |
+
+Only Task 16 (hardening & release) is untouched, and Task 15 is blocked on Windows access for its packaging/real-DPAPI/real-Word gates specifically (everything else in it is done). Task 7's remaining items are folded into Task 8 (autofix) territory, not independently blocked.
 
 Estimate ≈37 dev-days. Only Task 15 requires the Windows machine.
 
@@ -315,5 +321,7 @@ QT_QPA_PLATFORM=offscreen pytest -m gui -q
 - 2026-09-12 — Task 12 complete, closing Phase 5. `rules/{semantic,llm_client,cache}.py`: `semantic.py` gained a real `SemanticClient` Protocol, `SemanticCheckResult`, and `build_evaluator(ast, client, cache)` -- a closure with one text extractor per semantic rule id (each prompt asks about a different slice of the document) that `engine.validate()`'s new `evaluate_semantic` parameter accepts in place of Task 6's stub, which remains the default so every prior test keeps passing unchanged. `cache.py`'s `SemanticCache` keys on ruleset version, rule id, prompt template, model id, temperature, and normalized section text -- not document version, so a post-autofix re-validation pass is a guaranteed cache hit. `llm_client.py` is the only module importing `google.genai`; `GeminiSemanticClient.check()` classifies every SDK/transport exception and malformed response into one of the spec's eight failure reasons and never raises. `engine.validate()` also now runs semantic rules through a `ThreadPoolExecutor(max_workers=4)` after all deterministic rules complete, proven with a timed fake-evaluator test rather than just wiring the constant in unused. Found via a live-but-keyless connectivity check (auth fails before any generation happens, so this costs zero tokens): Gemini returns a plain HTTP 400 for an invalid key, not 401/403, with the real reason nested in `error.details[].reason`, which the checklist's status-code-only classification would have silently downgraded to a generic `service_error` -- exactly the distinction spec section 4.2 needs the report to preserve. Fixed and regression-tested with the real recorded error shape. 560 tests pass (67 new), 1 deselected (`live`, no `GEMINI_API_KEY` in this environment); ruff and mypy --strict clean.
 
 - 2026-09-12 — Task 13 complete, opening Phase 6. `pipeline.py`/`cli.py`: `pipeline.run()` orchestrates every stage built in Tasks 4-12 (parse, segment, validate with the real or stubbed semantic evaluator, plan fixes, write corrected/tracked/annotated documents, build the JSON report and audit log) behind one Qt-free façade, reporting progress through a plain callable. `PipelineOptions` gained `output_dir` and `api_key` fields the Task 1 scaffold didn't anticipate; `api_key` is a plain value so the façade never needs to know a settings store or DPAPI exist -- each shell finds its own key (CLI: `GEMINI_API_KEY` env var; UI, Task 14: `config.settings_store`). `cli.py`'s exit code reflects violation severity (`EXIT_OK`/`EXIT_NEEDS_REVIEW`/`EXIT_HIGH_SEVERITY`/`EXIT_ERROR`), computed from the actual `ValidationReport` rather than a parallel count. Verified against all five real manuscripts as a parametrized acceptance test: zero crashes, all five outputs written and non-empty, source-file SHA-256 unchanged throughout. 579 tests pass (30 new), 1 deselected; ruff and mypy --strict clean; both `python -m manuscript_validator.cli` and the installed console script confirmed working end to end.
+
+- 2026-09-12 — Task 14 complete, and with it the Linux-testable portion of Task 15 pulled forward (the settings screen needed a real store to talk to). `ui/{main_window,settings_window,report_view,workers}.py` + `app.py`: `PipelineWorker` (a `QRunnable`) runs `pipeline.run()` on a `QThreadPool` thread and marshals its plain progress callback onto `WorkerSignals`, the only Qt-aware adapter over the Qt-free pipeline; `SettingsDialog` talks only to `config.settings_store`'s module-level functions, never a `SecretBox` directly, so it is identical on Linux and Windows; `MainWindow` gates file operations behind a first-launch Settings modal exactly when `get_api_key()` returns `None` (spec section 4.1); `SectionOverridePanel` lets a human relabel a paragraph's detected section and re-run, with `pipeline.py` applying the override before validation (not just recording it) and `ValidationReport.section_overrides` (a new field, emitted only when non-empty, so Task 2's golden-file tests are untouched) preserving it for a reproducible re-run. Also landed `config/settings_store.py` + `settings_store_dev.py` + `settings_store_dpapi.py`: the `SecretBox` protocol, `NullSecretBox`/`FernetSecretBox` fully working and tested, and `DpapiSecretBox`'s call shape (entropy, `flags=0`, encrypt/decrypt round trip, decrypt-failure handling) verified against a fake `sys.modules["win32crypt"]` — everything Task 15 needs a Windows VM for (the real DPAPI round trip, the PyInstaller build, Inno Setup, real-Word verification) is what remains open there, tracked explicitly rather than silently skipped. `pytest-qt` added as a dev dependency; `QT_QPA_PLATFORM=offscreen` now sets itself automatically in `tests/conftest.py` so the whole suite runs headlessly with no manual step. 621 tests pass (65 new across the UI and settings-store work), 1 deselected (`live`); ruff and mypy --strict clean; the actual `app.py` bootstrap verified to construct a window and exit cleanly under offscreen rendering.
 
 _Last updated: 2026-09-12_

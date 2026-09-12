@@ -39,6 +39,12 @@ class ValidationReport:
     unchecked_scopes: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
+    #: Paragraph id -> section value, for every paragraph a human corrected
+    #: through the UI's section-override panel (Task 14). Recorded so a
+    #: second run of the same file reproduces the same corrected labelling
+    #: rather than the segmenter's original guess.
+    section_overrides: dict[str, str] = field(default_factory=dict)
+
     @property
     def total(self) -> int:
         return len(self.violations)
@@ -85,4 +91,6 @@ class ValidationReport:
             data["unchecked_scopes"] = list(self.unchecked_scopes)
         if self.notes:
             data["notes"] = list(self.notes)
+        if self.section_overrides:
+            data["section_overrides"] = dict(self.section_overrides)
         return data

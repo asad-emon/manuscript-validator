@@ -20,7 +20,7 @@ from docx import Document
 
 from manuscript_validator.autofix import plan_fixes
 from manuscript_validator.models.ast import Ast
-from manuscript_validator.models.enums import ViolationStatus
+from manuscript_validator.models.enums import Section, SectionSource, ViolationStatus
 from manuscript_validator.models.fix_plan import FixPlan
 from manuscript_validator.models.report import ValidationReport, utc_timestamp
 from manuscript_validator.models.violation import Violation
@@ -40,6 +40,7 @@ from manuscript_validator.rules.llm_client import GeminiSemanticClient
 from manuscript_validator.rules.loader import load_ruleset
 from manuscript_validator.rules.schema import Ruleset, SemanticRule
 from manuscript_validator.segmenter import segment
+from manuscript_validator.segmenter.section_index import SegmentationResult
 
 ProgressCallback = Callable[[str, float], None]
 
@@ -59,6 +60,11 @@ class PipelineOptions:
     apply_fixes: bool = True
     ruleset_id: str = "journal_v1"
     api_key: str | None = None
+    #: Paragraph id -> section value, from the UI's section-override panel
+    #: (Task 14): applied after segmentation and before validation, so a
+    #: human's correction of a wrong section label takes effect for every
+    #: rule that reads `paragraph.section`, not just the report.
+    section_overrides: dict[str, str] | None = None
 
 
 @dataclass
@@ -72,6 +78,10 @@ class PipelineResult:
     needs_review_count: int = 0
     check_failed_count: int = 0
     report: ValidationReport | None = None
+    #: The segmented AST (post-override, if any were supplied), exposed so a
+    #: caller -- the UI's section-override panel -- can list every paragraph
+    #: and its detected section without re-parsing the file itself.
+    ast: Ast | None = None
 
     @property
     def max_open_severity(self) -> str | None:
@@ -96,6 +106,47 @@ def _select_semantic_evaluator(
     client = GeminiSemanticClient(api_key=options.api_key)
     cache = SemanticCache(ruleset_version=ruleset.ruleset_version, model_id=client.model_id)
     return semantic.build_evaluator(ast, client, cache)
+
+
+def _apply_section_overrides(
+    ast: Ast,
+    segmentation: SegmentationResult,
+    ruleset: Ruleset,
+    overrides: dict[str, str],
+) -> SegmentationResult:
+    """A human correction from the UI's section-override panel (Task 14)
+    takes effect for every rule that reads `paragraph.section`, not just the
+    report -- applied here, once, before validation runs, rather than each
+    rule needing to know overrides exist.
+    """
+    section_paragraph_ids = {
+        section: list(ids) for section, ids in segmentation.section_paragraph_ids.items()
+    }
+    paragraphs_by_id = {paragraph.id: paragraph for paragraph in ast.paragraphs}
+
+    for paragraph_id, section_value in overrides.items():
+        paragraph = paragraphs_by_id.get(paragraph_id)
+        if paragraph is None:
+            continue
+        new_section = Section(section_value)
+        old_section = paragraph.section
+        if old_section is not None and paragraph_id in section_paragraph_ids.get(old_section, []):
+            section_paragraph_ids[old_section].remove(paragraph_id)
+        paragraph.section = new_section
+        paragraph.section_source = SectionSource.OVERRIDE
+        paragraph.section_confidence = 1.0
+        section_paragraph_ids.setdefault(new_section, []).append(paragraph_id)
+
+    detected = frozenset(section for section, ids in section_paragraph_ids.items() if ids)
+    missing = frozenset(ruleset.required_sections) - detected
+    return SegmentationResult(
+        section_paragraph_ids=section_paragraph_ids,
+        detected_sections=detected,
+        missing_sections=missing,
+        body_heading_count=segmentation.body_heading_count,
+        front_matter_only=segmentation.front_matter_only,
+        degraded_reason=segmentation.degraded_reason,
+    )
 
 
 def run(
@@ -124,6 +175,10 @@ def run(
 
     report_progress("segmenting", 0.2)
     segmentation = segment(ast, ruleset)
+    if options.section_overrides:
+        segmentation = _apply_section_overrides(
+            ast, segmentation, ruleset, options.section_overrides
+        )
 
     report_progress("validating", 0.3)
     evaluate_semantic = _select_semantic_evaluator(ast, ruleset, options)
@@ -164,7 +219,11 @@ def run(
 
     report_progress("writing report and audit log", 0.9)
     validation_report = build_report(
-        ast.document_id, ruleset.ruleset_version, violations, segmentation
+        ast.document_id,
+        ruleset.ruleset_version,
+        violations,
+        segmentation,
+        section_overrides=options.section_overrides,
     )
     paths.report.write_text(json.dumps(validation_report.to_dict(), indent=2), encoding="utf-8")
     outputs["report"] = paths.report
@@ -183,6 +242,7 @@ def run(
         needs_review_count=sum(1 for v in violations if v.needs_review),
         check_failed_count=sum(1 for v in violations if v.status is ViolationStatus.CHECK_FAILED),
         report=validation_report,
+        ast=ast,
     )
 
 

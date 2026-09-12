@@ -19,6 +19,7 @@ def build_report(
     ruleset_version: str,
     violations: list[Violation],
     segmentation: SegmentationResult,
+    section_overrides: dict[str, str] | None = None,
 ) -> ValidationReport:
     missing = sorted(section.value for section in segmentation.missing_sections)
     return ValidationReport(
@@ -27,6 +28,7 @@ def build_report(
         violations=violations,
         missing_sections=missing,
         unchecked_scopes=list(UNCHECKED_SCOPES),
+        section_overrides=dict(section_overrides) if section_overrides else {},
     )
 
 

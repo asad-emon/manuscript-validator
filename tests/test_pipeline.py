@@ -7,12 +7,16 @@ the design, not conventions.
 from __future__ import annotations
 
 import hashlib
+from io import BytesIO
 from pathlib import Path
 
 import pytest
+from docx import Document
+from lxml import etree
 
-from fixtures.factory import violating
+from fixtures.factory import build_compliant, violating
 from manuscript_validator.models.enums import ViolationStatus
+from manuscript_validator.parser.ast_builder import build_ast
 from manuscript_validator.pipeline import PipelineOptions, run
 
 REAL_MANUSCRIPTS = sorted((Path(__file__).parent / "fixtures" / "real").glob("*.docx"))
@@ -119,6 +123,57 @@ def test_missing_api_key_degrades_to_check_failed_not_a_crash(tmp_path: Path) ->
         if v.status is ViolationStatus.CHECK_FAILED
     }
     assert semantic_failures == {"api_key_missing"}
+
+
+def _remove_section_block(doc, heading_text: str, next_heading_text: str) -> None:
+    ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    body = doc.element.body
+    to_remove = []
+    capturing = False
+    for p in list(body.iterchildren()):
+        if etree.QName(p).localname != "p":
+            continue
+        text = "".join(t.text or "" for t in p.iter(f"{ns}t"))
+        if text.strip() == heading_text:
+            capturing = True
+        elif capturing and text.strip() == next_heading_text:
+            break
+        if capturing:
+            to_remove.append(p)
+    for p in to_remove:
+        p.getparent().remove(p)
+
+
+def test_section_override_reclassifies_a_paragraph_before_validation(tmp_path: Path) -> None:
+    """The UI's section-override panel (Task 14) must actually change what
+    every rule sees, not just annotate the report -- a missing required
+    section becomes present once a human relabels a paragraph, and the
+    override is recorded for a reproducible re-run."""
+    doc, _handles = build_compliant()
+    _remove_section_block(doc, "DISCUSSION", "CONCLUSION")
+    source = tmp_path / "paper.docx"
+    doc.save(source)
+
+    without_override = run(
+        source, PipelineOptions(output_dir=tmp_path / "out1", run_semantic=False)
+    )
+    assert "discussion" in without_override.report.missing_sections
+
+    source_bytes = source.read_bytes()
+    ast = build_ast(Document(BytesIO(source_bytes)), source_bytes)
+    conclusion_id = next(p.id for p in ast.paragraphs if p.text.strip() == "CONCLUSION")
+
+    with_override = run(
+        source,
+        PipelineOptions(
+            output_dir=tmp_path / "out2",
+            run_semantic=False,
+            section_overrides={conclusion_id: "discussion"},
+        ),
+    )
+
+    assert "discussion" not in with_override.report.missing_sections
+    assert with_override.report.section_overrides == {conclusion_id: "discussion"}
 
 
 @pytest.mark.parametrize("source", REAL_MANUSCRIPTS, ids=[p.stem for p in REAL_MANUSCRIPTS])
